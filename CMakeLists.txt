@@ -6,6 +6,7 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # 2) 指定可執行檔輸出到 bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_CXX_STANDARD 17) 
 
 # 確保 result 資料夾存在
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/result)
@@ -30,7 +31,7 @@ find_package(CGAL REQUIRED COMPONENTS Qt5)
 
 # 自動抓取 main.cpp 以及 src 資料夾底下所有 .cpp
 file(GLOB_RECURSE MAIN_SOURCES
-    "${CMAKE_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ShowGraph.cpp"
     "${CMAKE_SOURCE_DIR}/libs/*.cpp"
 )
 
@@ -42,9 +43,9 @@ file(GLOB_RECURSE MAIN_SOURCES
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # 添加可執行檔案
-add_executable(D2D ${MAIN_SOURCES})
+add_executable(ShowResult ${MAIN_SOURCES})
 # add_executable(BumpGenerator ${GEN_SOURCES})
 
 # 連結 Qt5 Widgets 和 CGAL
-target_link_libraries(D2D CGAL::CGAL Qt5::Widgets)
+target_link_libraries(ShowResult CGAL::CGAL Qt5::Widgets)
 # target_link_libraries(BumpGenerator CGAL::CGAL Qt5::Widgets)

@@ -1,18 +1,25 @@
 #include "Drawer.hpp"
 
-
 map<DieType, Qt::GlobalColor> BumpColor = {{DUMMY, Qt::gray}, {SIGNAL, Qt::red}, {VDD, Qt::blue}, {VSS, Qt::green}} ;
 map<DieType, Qt::GlobalColor> OffsetBumpColor = {{DUMMY, Qt::darkGray}, {SIGNAL, Qt::darkRed}, {VDD, Qt::darkBlue}, {VSS, Qt::darkGreen}} ;
 map<string, Qt::GlobalColor> NetColor = {{"power", Qt::blue}, {"ground", Qt::green}, {"Net", Qt::red}} ;
 
 //-------------------------------------------------------------------------------------
-Drawer::Drawer(DesignRule *designRule, QGraphicsScene *scene){
+Drawer::Drawer(const DesignRule *designRule, QGraphicsScene *scene){
+    SetDesignRule(designRule) ;
+    SetDesignScence(scene) ;
+}
+
+void Drawer::SetDesignRule(const DesignRule *designRule){
+    this->designRule = designRule ;
+    if(!designRule) return ;
+
     // 設定緩衝區策略
     const double via_radius_distance = designRule->viaOpeningDiameter / 2;
     const double via_buffer_distance = (designRule->viaPadDiameter - designRule->viaOpeningDiameter )/ 2;
     const double track_buffer_distance = designRule->minimumLineWidth / 2;
     const int points_per_circle = 36;
-    
+
     viaRadiutStrategy = boost::geometry::strategy::buffer::distance_symmetric<double>(via_radius_distance);
     bufferDistanceStrategy = boost::geometry::strategy::buffer::distance_symmetric<double>(via_buffer_distance);
     trackDistanceStrategy = boost::geometry::strategy::buffer::distance_symmetric<double>(track_buffer_distance);
@@ -21,11 +28,14 @@ Drawer::Drawer(DesignRule *designRule, QGraphicsScene *scene){
     circleStrategy = boost::geometry::strategy::buffer::point_circle(points_per_circle);
     sideStrategy = boost::geometry::strategy::buffer::side_straight();
 
-    this->scene = scene ; 
-    this->designRule = designRule ; 
+    teaddropRadius = designRule->viaOpeningDiameter / 2 + (designRule->viaPadDiameter - designRule->viaOpeningDiameter ) / 2 ;
 }
 
-void Drawer::DrawBump(Bump &bump, Qt::GlobalColor bumpColor){
+void Drawer::SetDesignScence(QGraphicsScene *scene){
+    this->scene = scene ; 
+}
+
+void Drawer::DrawBump(const Bump &bump, Qt::GlobalColor bumpColor){
     multi_polygon buffer, final_outer_buffer;
     point pt(bump.x, bump.y) ; 
     
@@ -62,8 +72,7 @@ void Drawer::DrawBump(Bump &bump, Qt::GlobalColor bumpColor){
     }
 }
 
-void Drawer::DrawOffsetBump(Bump &bump, Bump &matchedBump){
-
+void Drawer::DrawOffsetBump(const Bump &bump, const Bump &matchedBump){
 
     point center1(bump.x, bump.y);
     point center2(matchedBump.x, matchedBump.y);  // 兩個圓心相距 50，彼此不相交
@@ -78,8 +87,6 @@ void Drawer::DrawOffsetBump(Bump &bump, Bump &matchedBump){
     boost::geometry::convex_hull(merged_area, convex_hull);
     boost::geometry::buffer(convex_hull, final_outer_buffer, bufferDistanceStrategy, sideStrategy, joinStrategy, endStrategy, circleStrategy);
 
-
-
     for (const auto &poly : final_outer_buffer) {
         QPolygonF qpoly;
         for (const auto &pt : poly.outer()) {
@@ -93,7 +100,7 @@ void Drawer::DrawOffsetBump(Bump &bump, Bump &matchedBump){
 
 }
 
-void Drawer::DrawNets(Net& net, Qt::GlobalColor netColor){
+void Drawer::DrawNet(const Net& net, Qt::GlobalColor netColor){
     
     if(netColor==Qt::yellow){
         for(auto& [type, color] : NetColor){
@@ -120,15 +127,14 @@ void Drawer::DrawNets(Net& net, Qt::GlobalColor netColor){
     }
 }
 
-void Drawer::DrawTeardrop(tuple<Bump, double, double, double, double>& teardrop) {
+void Drawer::DrawTeardrop(const tuple<Bump, double, double, double, double>& teardrop) {
     point bumpPt(get<1>(teardrop), get<2>(teardrop)) ;
     point segPt(get<3>(teardrop), get<4>(teardrop)) ;
-    cout << get<0>(teardrop) << " " << get<1>(teardrop) << " " << get<2>(teardrop) << " " << get<3>(teardrop) << " " << get<4>(teardrop) << "\n" ;
+    // cout << get<0>(teardrop) << " " << get<1>(teardrop) << " " << get<2>(teardrop) << " " << get<3>(teardrop) << " " << get<4>(teardrop) << "\n" ;
     _DrawTeardrop(bumpPt, segPt) ;
 }
 
 void Drawer::_DrawTeardrop(const point& center1, const point& center2) {
-    double radius = designRule->viaOpeningDiameter / 2 + (designRule->viaPadDiameter - designRule->viaOpeningDiameter )/ 2;
     multi_polygon circle_poly, final_outer_buffer;
 
     boost::geometry::buffer(center1, circle_poly, bufferDistanceStrategy, sideStrategy, joinStrategy, endStrategy, circleStrategy);
@@ -146,18 +152,18 @@ void Drawer::_DrawTeardrop(const point& center1, const point& center2) {
     // 圓心->外部點的角度
     double theta = std::atan2(dy, dx);
     // 切線與圓心連線的夾角
-    double alpha = std::acos(radius / d);
+    double alpha = std::acos(teaddropRadius / d);
 
     // 兩條切線與圓心連線的角度
     double theta1 = theta + alpha;
     double theta2 = theta - alpha;
 
     // 對應切點的座標
-    double tx1_1 = x1 + radius * std::cos(theta1);
-    double ty1_1 = y1 + radius * std::sin(theta1);
+    double tx1_1 = x1 + teaddropRadius * std::cos(theta1);
+    double ty1_1 = y1 + teaddropRadius * std::sin(theta1);
 
-    double tx1_2 = x1 + radius * std::cos(theta2);
-    double ty1_2 = y1 + radius * std::sin(theta2);
+    double tx1_2 = x1 + teaddropRadius * std::cos(theta2);
+    double ty1_2 = y1 + teaddropRadius * std::sin(theta2);
 
     // 建立 Boost.Geometry point
     point T1(tx1_1, ty1_1);
@@ -184,13 +190,22 @@ void Drawer::_DrawTeardrop(const point& center1, const point& center2) {
     tailPen.setWidth(1);
 
     // (4) 繪製「尾巴區域」(tail_portion)
-    for (auto const &poly : tail_portion)
-    {
+    for (auto const &poly : tail_portion){
         QPolygonF qpoly;
-        for (auto const &pt : poly.outer())
-        {
+        for (auto const &pt : poly.outer()){
             qpoly << QPointF(bg::get<0>(pt), bg::get<1>(pt));
         }
         scene->addPolygon(qpoly, tailPen, tailBrush);
     }
+}
+
+void Drawer::DrawDieBoundary(const vector<double>& coordinate){
+    QBrush redBrush(Qt::red); 
+    QPen redPen(Qt::red); redPen.setWidth(1);
+
+    scene->addLine(coordinate[0], coordinate[1], coordinate[0], coordinate[3], redPen);
+    scene->addLine(coordinate[2], coordinate[1], coordinate[2], coordinate[3], redPen);
+    scene->addLine(coordinate[0], coordinate[1], coordinate[2], coordinate[1], redPen);
+    scene->addLine(coordinate[0], coordinate[3], coordinate[2], coordinate[3], redPen);
+
 }

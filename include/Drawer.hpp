@@ -61,11 +61,6 @@ void QtDrawBump(QGraphicsScene *scene, vector<Bump> &bumps, vector<double> &rout
 
 class Drawer {
 private:
-    QGraphicsScene *scene ;
-    DesignRule *designRule ;
-
-    void _DrawTeardrop(const point& center1, const point& center2) ;
-public:
     bg::strategy::buffer::distance_symmetric<double> viaRadiutStrategy = bg::strategy::buffer::distance_symmetric<double>(0.0) ;
     bg::strategy::buffer::distance_symmetric<double> bufferDistanceStrategy = bg::strategy::buffer::distance_symmetric<double>(0.0) ;
     bg::strategy::buffer::distance_symmetric<double> trackDistanceStrategy = bg::strategy::buffer::distance_symmetric<double>(0.0) ;
@@ -73,20 +68,23 @@ public:
     bg::strategy::buffer::end_round endStrategy = bg::strategy::buffer::end_round(0) ;
     bg::strategy::buffer::point_circle circleStrategy = bg::strategy::buffer::point_circle(0) ;
     bg::strategy::buffer::side_straight sideStrategy = bg::strategy::buffer::side_straight() ;
+    double teaddropRadius = 0.0 ;
 
-    Drawer(DesignRule *designRule, QGraphicsScene *scene) ;
-    void SetDesignRule(DesignRule *designRule) ; 
+    const DesignRule *designRule = nullptr ;
+    QGraphicsScene *scene = nullptr ;
+
+    void _DrawTeardrop(const point& center1, const point& center2) ;
+    
+public:
+    Drawer(const DesignRule *designRule=nullptr, QGraphicsScene *scene=nullptr) ;
+    void SetDesignRule(const DesignRule *designRule) ; 
     void SetDesignScence(QGraphicsScene *scene) ; 
 
-    void DrawBump(Bump &bump, Qt::GlobalColor bumpColor=Qt::yellow) ; // yellow for default indiactor (will use other colors to show bumps)
-    void DrawOffsetBump(Bump &bump, Bump &matchedBump) ;
-    void DrawNets(Net& net, Qt::GlobalColor bumpColor=Qt::yellow) ; // 目前只能塗特定顏色, 因為net list資訊刮
-    void DrawTeardrop(tuple<Bump, double, double, double, double>& teardrop) ; //Bump與最近的線段接Teardrop
- 
-    
-
-    // void DrawNet(Bump &bump) ; 
-
+    void DrawBump(const Bump &bump, Qt::GlobalColor bumpColor=Qt::yellow) ; // yellow for default indiactor (will use other colors to show bumps)
+    void DrawOffsetBump(const Bump &bump, const Bump &matchedBump) ;
+    void DrawNet(const Net& net, Qt::GlobalColor bumpColor=Qt::yellow) ; // 目前只能塗特定顏色, 因為net list資訊刮
+    void DrawTeardrop(const tuple<Bump, double, double, double, double>& teardrop) ; 
+    void DrawDieBoundary(const vector<double>& coordinate) ;
     // void DrawOneRDL(vector<Bump> &bumps, vector<double> &coordinate) ; 
     // void DrawAllRDL(vector<Bump> &bumps, vector<double> &coordinate) ; 
 } ;

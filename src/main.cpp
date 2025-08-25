@@ -71,8 +71,6 @@ int main(int argc, char *argv[]) {
     for(int i=0; i<offsetBumps1.size(); i++) drawer.DrawOffsetBump(offsetBumps1[i], offsetBumps2[i]) ;
     for(int i=0; i<nets.size(); i++) drawer.DrawNets(nets[i]) ;
 
-
-
     sceneCache[0] = cachedScene ;
     view.resetTransform();
     view.setScene(sceneCache[0]);  // 在一開始顯示 bump layer 的場景
