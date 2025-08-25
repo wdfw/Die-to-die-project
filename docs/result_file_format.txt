@@ -1,0 +1,11 @@
+結果格式
+1. netlist_X
+2. via_layer_X
+3. offset_via_layer_X
+
+---------------offset_via_layer_X format---------------------
+$die_name $bump_type $bump_id $original_X $original_Y $offset_X $offset_Y
+.
+.
+.
+-------------------------------------------------------------

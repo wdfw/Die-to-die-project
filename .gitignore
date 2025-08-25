@@ -1,0 +1,13 @@
+icons/
+bin/
+build/
+.*/
+resources/
+result/
+case/
+bin/
+Makefile
+testcase/
+cmake*
+CMakeFiles/
+CMakeCache.txt

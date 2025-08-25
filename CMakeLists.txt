@@ -1,0 +1,50 @@
+cmake_minimum_required(VERSION 3.10)
+project(D2D)
+
+# 1) 確保 bin 資料夾存在
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
+# 2) 指定可執行檔輸出到 bin
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
+# 確保 result 資料夾存在
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/result)
+
+# 只清空 result 資料夾內容（保留執行檔）
+add_custom_target(cleanResult
+  COMMENT "清空 result 目錄下的所有檔案，但保留資料夾與執行檔"
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/result
+  COMMAND ${CMAKE_COMMAND} -E make_directory  ${CMAKE_SOURCE_DIR}/result
+)
+
+# for cgal
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build" FORCE)
+endif()
+
+# 尋找 Qt5 Widgets 模組
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
+
+# 查找 CGAL 套件
+find_package(CGAL REQUIRED COMPONENTS Qt5)
+
+# 自動抓取 main.cpp 以及 src 資料夾底下所有 .cpp
+file(GLOB_RECURSE MAIN_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_SOURCE_DIR}/libs/*.cpp"
+)
+
+# file(GLOB_RECURSE GEN_SOURCES
+#     "${CMAKE_SOURCE_DIR}/src/BumpGenerator.cpp"
+#     "${CMAKE_SOURCE_DIR}/include/*.cpp"
+# )
+# 添加頭文件目錄
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
+# 添加可執行檔案
+add_executable(D2D ${MAIN_SOURCES})
+# add_executable(BumpGenerator ${GEN_SOURCES})
+
+# 連結 Qt5 Widgets 和 CGAL
+target_link_libraries(D2D CGAL::CGAL Qt5::Widgets)
+# target_link_libraries(BumpGenerator CGAL::CGAL Qt5::Widgets)
