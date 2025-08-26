@@ -1,9 +1,11 @@
 #include <iostream>
+#include <vector>
+#include <ctime>
 
-#include "Drawer.hpp"
 #include "Bump.hpp"
 #include "DesignRule.hpp"
 #include "Parser.hpp"
+#include "GlobalRouting.hpp"
 
 //Drawer.hppㄧ定要include在最上層
 
@@ -23,18 +25,24 @@ int main(int argc, char *argv[]) {
     string outputDirectories = argv[2] ;
 
     DesignRule designRule ; 
-    vector<Bump> bumps ; 
+    vector<Bump> allBumps, die1Bumps, die2Bumps ; 
     vector<double> coordinate ; 
     vector<RoutingGraph> allRDL ;
     vector<clock_t> globalRouteTimes, getailedRouteTimes ;
 
-    ParseBump(bumpFilePath, bumps, coordinate) ;
+    ParseBump(bumpFilePath, allBumps, coordinate) ;
     ParseDesignRule(designRulePath, designRule) ;
     
-    num_of_layers = routingGuideGenerate(bumps, coordinate, designRule, outputDirectories, allRDL, offset, GlobalRouteTime);
+    copy_if(allBumps.begin(), allBumps.end(), die1Bumps.begin(), [](const Bump& bump){return bump.name=="DIE1"; })
+    copy_if(allBumps.begin(), allBumps.end(), die2Bumps.begin(), [](const Bump& bump){return bump.name=="DIE2"; })
+
+    // num_of_layers = routingGuideGenerate(bumps, coordinate, designRule, outputDirectories, allRDL, offset, GlobalRouteTime);
 
     return 0 ;
 }
-//./bin/D2D case/d2d_case_bump.location case/design.rule d2d_result 48
+// 目前假設情境
+// 1. DIE1在DIE2左邊
 
-//這裡的via N代表第N與N-1層的via
+
+//./bin/D2D case/d2d_case_bump.location case/design.rule d2d_result 48
+//./bin/D2D case/d2d_case_bump.location case/design.rule wu_result/ 
