@@ -1,15 +1,13 @@
 #pragma once
+#include "Bump.hpp"
 
 // 定義 Via Node
 struct ViaNode {
     string dieName;
-    string type;
+    DieType type;
     int id;          
     double x, y;      
-
-    ViaNode() : dieName(""), type(""), id(-1), x(0), y(0) {} 
-    ViaNode(string dieName, string type, int id, double x, double y)
-        : dieName(dieName), type(type), id(id), x(x), y(y) {}
+    ViaNode(const string& dieName="", DieType type=DUMMY, int id=-1, double x=0.0, double y=0.0) : dieName(dieName), type(type), id(id), x(x), y(y) {}
 };
 
 // 定義 Edge Node，包含 Net-Sequence List (使用 Single Linked List)

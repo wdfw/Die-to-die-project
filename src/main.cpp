@@ -46,3 +46,5 @@ int main(int argc, char *argv[]) {
 //./bin/ShowResult result/ case/design.rule
 
 //./bin/ShowResult wu_result/ case/design.rule
+
+// ./bin/D2D result/RDL1/via_layer_1 case/design.rule wu_result/ > wu_result/RDL1/via_layer_1 ; ./bin/ShowResult wu_result/ case/design.rule

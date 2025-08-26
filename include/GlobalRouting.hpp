@@ -25,3 +25,4 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
 
 vector<Bump> ProcessLeftAndRight(const vector<Bump>& bumps, const vector<Bump>& leftmostBumps, const vector<double>& routing_area_coordinate, double Hor_SPACING_X) ;
 vector<Bump> FindLeftmostInEachRow(const vector<Bump>& bumps) ;
+vector<EdgeNode> Triangulation(const vector<ViaNode>& via_nodes, const DesignRule& designRule) ;

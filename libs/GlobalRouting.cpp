@@ -52,14 +52,15 @@ int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routing_area_co
 }
 
 void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routing_area_coordinate, const DesignRule& designRule, const string& output_path, double Hor_SPACING_X, int layer, vector<RoutingGraph>& allRDL){
-    RoutingGraph RDL; 
+    RoutingGraph RDL1, RDL2 ; 
     
     vector<Bump> die1Bumps, die2Bumps ; 
     vector<Bump> die1LeftmostBumps, die2LeftmostBumps ; // = FindLeftmostInEachRow(bumps);
     vector<Bump> die1DummyBumps, die2DummyBumps ; // = ProcessLeftAndRight(bumps, leftmostBumps, routing_area_coordinate, Hor_SPACING_X);
     vector<double> die1Coordinate, die2Coordinate ; 
 
-    //
+    ofstream outputViaFile, outputTriangulationFile ; 
+    //未來需要調整的部分!!!
     die1Coordinate = routing_area_coordinate ; die1Coordinate[2] = routing_area_coordinate[2]/2 - Hor_SPACING_X ; 
     die2Coordinate = routing_area_coordinate ; die2Coordinate[0] = routing_area_coordinate[2]/2 + Hor_SPACING_X ; 
 
@@ -72,22 +73,29 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     die1DummyBumps = ProcessLeftAndRight(die1Bumps, die1LeftmostBumps, die1Coordinate, Hor_SPACING_X) ;
     die2DummyBumps = ProcessLeftAndRight(die2Bumps, die2LeftmostBumps, die2Coordinate, Hor_SPACING_X) ;
 
-    for(auto& it : die1Bumps) cout << it << "\n" ;
-    for(auto& it : die2Bumps) cout << it << "\n" ;
-    for(auto& it : die1DummyBumps) cout << it << "\n" ;
-    for(auto& it : die2DummyBumps) cout << it << "\n" ;
+    outputViaFile.open(output_path + "via_layer_" + to_string(layer)) ;
+    for(auto& bump : die1Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : die2Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : die1DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : die2DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    outputViaFile.close() ;
 
-    // for(auto bump : bumps){
-    //     RDL.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
-    // }
-        
-    // for(auto dummy : dummys){
-    //     RDL.via_nodes.push_back("dum", DUMMY, dummy.id, dummy.x, dummy.y);
-    // }
+
+
+    for(auto bump : die1Bumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+    for(auto bump : die1DummyBumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+
+    for(auto bump : die2Bumps) RDL2.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+    for(auto bump : die2DummyBumps) RDL2.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
 
     // 使用 CDT 進行三角化
-    // RDL.edge_nodes = triangulation(RDL.via_nodes, output_path, designRule);
+    RDL1.edge_nodes = Triangulation(RDL1.via_nodes, designRule);
+    RDL2.edge_nodes = Triangulation(RDL2.via_nodes, designRule);
     
+    outputTriangulationFile.open(output_path + "triangulation_edge");
+    for(auto& edgeNode : RDL1.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
+    for(auto& edgeNode : RDL2.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
+    outputTriangulationFile.close() ;
 
 }
 
@@ -103,8 +111,8 @@ vector<Bump> ProcessLeftAndRight(const vector<Bump>& bumps, const vector<Bump>& 
         double current_x = point.x;
 
         // 向左移動
-        while (current_x - Hor_SPACING_X >= min_x) {
-            current_x -= Hor_SPACING_X;
+        while (current_x - Hor_SPACING_X >= min_x + Hor_SPACING_X) {
+            current_x -= Hor_SPACING_X ;
             newPoint = Bump("Dummy", DUMMY, dummies.size(), current_x, point.y);
 
             if(find_if(bumps.begin(), bumps.end(), [&newPoint](const Bump& bump){return fabs(bump.x - newPoint.x) < EPSILON_X && fabs(bump.y - newPoint.y) < EPSILON_Y;})==bumps.end()){
@@ -112,15 +120,27 @@ vector<Bump> ProcessLeftAndRight(const vector<Bump>& bumps, const vector<Bump>& 
             }
         }
 
+        current_x = min_x ; 
+        newPoint = Bump("Dummy", DUMMY, dummies.size(), current_x, point.y);
+        if(find_if(bumps.begin(), bumps.end(), [&newPoint](const Bump& bump){return fabs(bump.x - newPoint.x) < EPSILON_X && fabs(bump.y - newPoint.y) < EPSILON_Y;})==bumps.end()){
+            dummies.push_back(newPoint);
+        }
+
         // 向右移動
         current_x = point.x;
-        while (current_x + Hor_SPACING_X <= max_x) {
+        while (current_x + Hor_SPACING_X <= max_x - Hor_SPACING_X) {
             current_x += Hor_SPACING_X;
             newPoint = Bump("Dummy", DUMMY, dummies.size(), current_x, point.y);
 
             if(find_if(bumps.begin(), bumps.end(), [&newPoint](const Bump& bump){return fabs(bump.x - newPoint.x) < EPSILON_X && fabs(bump.y - newPoint.y) < EPSILON_Y;})==bumps.end()){
                 dummies.push_back(newPoint);
             }
+        }
+
+        current_x = max_x ; 
+        newPoint = Bump("Dummy", DUMMY, dummies.size(), current_x, point.y);
+        if(find_if(bumps.begin(), bumps.end(), [&newPoint](const Bump& bump){return fabs(bump.x - newPoint.x) < EPSILON_X && fabs(bump.y - newPoint.y) < EPSILON_Y;})==bumps.end()){
+            dummies.push_back(newPoint);
         }
     }
 
@@ -162,3 +182,152 @@ vector<Bump> FindLeftmostInEachRow(const vector<Bump>& bumps) {
     return result;
 }
 
+
+vector<EdgeNode> Triangulation(const vector<ViaNode>& via_nodes, const DesignRule& designRule) {
+    map<Point, ViaNode> point_to_via;
+    vector<Point> allPoints;
+
+    for (const auto &node : via_nodes) {
+        Point p(node.x, node.y);
+        point_to_via[p] = node;
+        allPoints.push_back(p);
+    }
+
+    CDT cdt;
+
+    // === Y 分組（允許誤差）===
+    vector<vector<Point>> y_groups;
+    sort(allPoints.begin(), allPoints.end(), [](const Point& a, const Point& b) {
+        return a.y() < b.y();
+    });
+
+    for (const auto& pt : allPoints) {
+        bool added = false;
+        for (auto& group : y_groups) {
+            if (!group.empty() && fabs(group[0].y() - pt.y()) < EPSILON_Y) {
+                group.push_back(pt);
+                added = true;
+                break;
+            }
+        }
+        if (!added) {
+            y_groups.push_back({pt});
+        }
+    }
+
+    // === 每組內按 x 連線 ===
+    for (const auto& group : y_groups) {
+        vector<Point> sorted_group = group;
+        sort(sorted_group.begin(), sorted_group.end(), [](const Point& a, const Point& b) {
+            return a.x() < b.x();
+        });
+        for (size_t i = 1; i < sorted_group.size(); ++i) { // 我的 CDT 規則 => 相同 y 值的點, 要先連在一起
+            cdt.insert_constraint(sorted_group[i - 1], sorted_group[i]);
+        }
+    }
+
+    // === 每組最左點/最右點垂直連線 === => 我的 CDT 規則
+    vector<Point> left_points, right_points;
+    for (const auto& group : y_groups) {
+        auto [min_it, max_it] = minmax_element(group.begin(), group.end(),
+            [](const Point& a, const Point& b) { return a.x() < b.x(); });
+        left_points.push_back(*min_it);
+        right_points.push_back(*max_it);
+    }
+
+    sort(left_points.begin(), left_points.end(), [](const Point& a, const Point& b) {
+        return a.y() < b.y();
+    });
+    sort(right_points.begin(), right_points.end(), [](const Point& a, const Point& b) {
+        return a.y() < b.y();
+    });
+
+    for (size_t i = 1; i < left_points.size(); ++i)
+        cdt.insert_constraint(left_points[i - 1], left_points[i]);
+    for (size_t i = 1; i < right_points.size(); ++i)
+        cdt.insert_constraint(right_points[i - 1], right_points[i]);
+
+    // === 插入所有點三角化 ===
+    cdt.insert(allPoints.begin(), allPoints.end());
+
+    // === 處理 CDT 邊 ===
+    vector<EdgeNode> edges;
+    int edgeId = 0;
+    
+    // ofstream outFile(output_path + "triangulation_edge", ofstream::app);
+
+    for (auto edge = cdt.finite_edges_begin(); edge != cdt.finite_edges_end(); ++edge) {
+        auto segment = cdt.segment(*edge);
+        double dx = segment.source().x() - segment.target().x();
+        double dy = segment.source().y() - segment.target().y();
+        double L = sqrt(dx * dx + dy * dy);
+        double ux = dx / L, uy = dy / L;
+
+        double newSourceX, newSourceY, newTargetX, newTargetY;
+        if (point_to_via[segment.source()].type == DUMMY) {
+            newSourceX = segment.source().x();
+            newSourceY = segment.source().y();
+            // outFile << newSourceX << " " << newSourceY << " ";
+        } else { // 因為CDT的邊, 都是從 bump 的圓心出發, 畫出來的邊會壓到圓形, 所以要特殊處理
+            newSourceX = segment.source().x() - (1 + designRule.viaOpeningDiameter / 2 +
+                         (designRule.viaPadDiameter - designRule.viaOpeningDiameter) / 2) * ux;
+            newSourceY = segment.source().y() - (1 + designRule.viaOpeningDiameter / 2 +
+                         (designRule.viaPadDiameter - designRule.viaOpeningDiameter) / 2) * uy;
+            // outFile << newSourceX << " " << newSourceY << " ";
+        }
+
+        if (point_to_via[segment.target()].type == DUMMY) {
+            newTargetX = segment.target().x();
+            newTargetY = segment.target().y();
+            // outFile << newTargetX << " " << newTargetY << "\n";
+        } else { // 因為CDT的邊, 都是從 bump 的圓心出發, 畫出來的邊會壓到圓形, 所以要特殊處理
+            newTargetX = segment.target().x() + (1 + designRule.viaOpeningDiameter / 2 +
+                         (designRule.viaPadDiameter - designRule.viaOpeningDiameter) / 2) * ux;
+            newTargetY = segment.target().y() + (1 + designRule.viaOpeningDiameter / 2 +
+                         (designRule.viaPadDiameter - designRule.viaOpeningDiameter) / 2) * uy;
+            // outFile << newTargetX << " " << newTargetY << "\n";
+        }
+
+        double x = (segment.source().x() + segment.target().x()) / 2; // CDT線段的中心點, 當作 EdgeNode 的 x, y 座標
+        double y = (segment.source().y() + segment.target().y()) / 2;
+        double distance = hypot(newSourceX - newTargetX, newSourceY - newTargetY);
+        int capacity = floor(distance / (2*(designRule.minimumLineWidth + designRule.minimumLineSpacing))); 
+        if(capacity > 5 || capacity < 5) capacity = 5; // 限制最大容量為 5
+
+        EdgeNode newEdgeNode(edgeId++, x, y,
+            vector<ViaNode>{point_to_via[segment.source()], point_to_via[segment.target()]}, // Edge Node 紀錄連接的兩個 ViaNode
+            capacity);
+
+        string src_type = point_to_via[segment.source()].type + "_" + to_string(point_to_via[segment.source()].id);
+        string tgt_type = point_to_via[segment.target()].type + "_" + to_string(point_to_via[segment.target()].id);
+
+        // 判斷 net_sequence 的方向
+        if (fabs(segment.source().y() - segment.target().y()) > EPSILON_Y) { // Edge Node 連接的兩個 ViaNode 的 y 值不同
+            if (segment.source().y() < segment.target().y()) {
+                newEdgeNode.net_sequence = {src_type, tgt_type}; // 紀錄 net sequence list 的 head node 和 tail node, 並同時紀錄兩端的座標, detailed route 較方便
+                newEdgeNode.start = {newSourceX, newSourceY};
+                newEdgeNode.end   = {newTargetX, newTargetY};
+            } else {  // source.y > target.y
+                newEdgeNode.net_sequence = {tgt_type, src_type};
+                newEdgeNode.start = {newTargetX, newTargetY};
+                newEdgeNode.end   = {newSourceX, newSourceY};
+            }
+        } else {
+            // Edge Node 連接的兩個 ViaNode 的 y 值相同, 比較 x 值
+            if (segment.source().x() > segment.target().x()) {
+                newEdgeNode.net_sequence = {src_type, tgt_type};
+                newEdgeNode.start = {newSourceX, newSourceY};
+                newEdgeNode.end   = {newTargetX, newTargetY};
+            } else {
+                newEdgeNode.net_sequence = {tgt_type, src_type};
+                newEdgeNode.start = {newTargetX, newTargetY};
+                newEdgeNode.end   = {newSourceX, newSourceY};
+            }
+        }
+
+        edges.push_back(newEdgeNode);
+    }
+
+    // outFile.close();
+    return edges;
+}
