@@ -200,7 +200,6 @@ void Drawer::_DrawTeardrop(const point& center1, const point& center2) {
 }
 
 void Drawer::DrawDieBoundary(const vector<double>& coordinate){
-    QBrush redBrush(Qt::red); 
     QPen redPen(Qt::red); redPen.setWidth(1);
 
     scene->addLine(coordinate[0], coordinate[1], coordinate[0], coordinate[3], redPen);
@@ -208,4 +207,9 @@ void Drawer::DrawDieBoundary(const vector<double>& coordinate){
     scene->addLine(coordinate[0], coordinate[1], coordinate[2], coordinate[1], redPen);
     scene->addLine(coordinate[0], coordinate[3], coordinate[2], coordinate[3], redPen);
 
+}
+
+void Drawer::DrawTriangulation(const tuple<double, double, double, double>& edge){
+    QPen whitePen(Qt::white); whitePen.setWidth(1);
+    scene->addLine(get<0>(edge), get<1>(edge), get<2>(edge), get<3>(edge), whitePen);
 }

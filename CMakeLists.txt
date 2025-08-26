@@ -18,6 +18,11 @@ add_custom_target(cleanResult
   COMMAND ${CMAKE_COMMAND} -E make_directory  ${CMAKE_SOURCE_DIR}/result
 )
 
+add_custom_target(show
+  COMMAND ./bin/ShowResult result/ case/design.rule 
+)
+
+
 # for cgal
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build" FORCE)
@@ -31,7 +36,7 @@ find_package(CGAL REQUIRED COMPONENTS Qt5)
 
 # 自動抓取 main.cpp 以及 src 資料夾底下所有 .cpp
 file(GLOB_RECURSE MAIN_SOURCES
-    "${CMAKE_SOURCE_DIR}/src/ShowGraph.cpp"
+    "${CMAKE_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_SOURCE_DIR}/libs/*.cpp"
 )
 
@@ -43,9 +48,9 @@ file(GLOB_RECURSE MAIN_SOURCES
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # 添加可執行檔案
-add_executable(ShowResult ${MAIN_SOURCES})
+add_executable(D2D ${MAIN_SOURCES})
 # add_executable(BumpGenerator ${GEN_SOURCES})
 
 # 連結 Qt5 Widgets 和 CGAL
-target_link_libraries(ShowResult CGAL::CGAL Qt5::Widgets)
+target_link_libraries(D2D CGAL::CGAL Qt5::Widgets)
 # target_link_libraries(BumpGenerator CGAL::CGAL Qt5::Widgets)

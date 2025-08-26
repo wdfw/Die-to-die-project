@@ -1,6 +1,5 @@
 #include "Generator.hpp"
 
-
 void GenerateBumpCaseFiles(int num_signals, const string &case_path, const string &via_path, double &offset){
     // offset = 2.5;
     const double Triangle_Length = 7.0;

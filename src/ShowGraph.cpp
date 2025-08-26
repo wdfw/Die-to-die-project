@@ -6,12 +6,10 @@
 #include "Drawer.hpp" //Drawer.hppㄧ定要include在最上層
 #include "Bump.hpp"
 #include "DesignRule.hpp"
-#include "Generator.hpp"
 #include "Parser.hpp"
 #include "Utils.hpp"
 
 using namespace std ; 
-
 
 void Reload(const vector<string>& RDLDirectories, const string& designRulePath, vector<QGraphicsScene*>& sceneCache){
     Drawer drawer ; 
@@ -19,11 +17,14 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
     string offsetViaPath ;
     string netListPath ;
     string teardropPath ;
+    string triangulationPath ; 
 
     vector<Bump> bumps, offsetBumps1, offsetBumps2 ; // 在 bump layer 上的點
     vector<double> coordinate ;  // min_x, min_y, max_x, max_y
     vector<Net> nets ; 
     vector<tuple<Bump, double, double, double, double>> teardrops ;
+    vector<tuple<double, double, double, double>> triangulationEdges ;
+
     vector<Bump> allBumps ;
     DesignRule designRule;
 
@@ -45,8 +46,14 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
         offsetViaPath = dir + "/offset_via_layer_" + layerNumber ; 
         netListPath = dir + "/netlist_" + layerNumber ; 
         teardropPath = dir + "/teardrop_" + layerNumber ; 
-        
+        triangulationPath = dir + "/triangulation_edge" ;
+
         drawer.SetDesignScence(sceneCache[i+1]) ;
+        
+        if(filesystem::exists(triangulationPath)){
+            ParseTriangulation(triangulationPath, triangulationEdges) ;
+            for(int i=0; i<triangulationEdges.size(); i++) drawer.DrawTriangulation(triangulationEdges[i]) ;
+        }
 
         if(filesystem::exists(teardropPath)){
             ParseTeardrop(teardropPath, teardrops) ;
@@ -68,6 +75,7 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
             ParseNet(netListPath, nets) ;
             for(int i=0; i<nets.size(); i++) drawer.DrawNet(nets[i]) ;
         }
+
     }
 }
 

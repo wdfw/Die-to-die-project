@@ -88,7 +88,6 @@ void ParseOffsetBump(const string &inputPath, vector<Bump> &bumps, vector<Bump> 
 
 void ParseNet(const string &inputPath, vector<Net> &nets){
     
-
     ifstream file(inputPath);
     if(!file.is_open()) throw runtime_error("[ParseNet] Failed to open netlist file: " + inputPath);
 
@@ -126,5 +125,22 @@ void ParseTeardrop(const string &inputPath, vector<tuple<Bump, double, double, d
         istringstream iss(line);
         if (!(iss >> dieName >> type >> id >> x1 >> y1 >> x2 >> y2 )) throw runtime_error("[ParseTeardrop] Error parsing in line #" + to_string(lineNumber)) ;
         teardrops.push_back({{dieName, Str2DieType(type), id, x1, y1}, x1, y1, x2, y2}) ; //x1, y1是bump位置, x2, y2是目標線段起點的位置
+    }
+}
+
+void ParseTriangulation(const string &inputPath, vector<tuple<double, double, double, double>> &triangulationEdges){
+    ifstream file(inputPath);
+    if(!file.is_open()) throw runtime_error("[ParseTriangulation] Failed to open triangulation file: " + inputPath);
+
+    string line, dieName, type ;
+    double x1, y1, x2, y2 ; ;
+
+    triangulationEdges.clear() ; 
+    for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
+
+        istringstream iss(line);
+        if (!(iss >> x1 >> y1 >> x2 >> y2 )) throw runtime_error("[ParseTriangulation] Error parsing in line #" + to_string(lineNumber)) ;
+        triangulationEdges.push_back({x1, y1, x2, y2}) ; 
     }
 }

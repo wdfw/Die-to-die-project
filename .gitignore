@@ -4,6 +4,7 @@ build/
 .*/
 resources/
 result/
+wu_result/
 case/
 bin/
 Makefile
