@@ -1,6 +1,6 @@
 #include "Parser.hpp"
 
-void ParseBump(const string &inputPath, vector<Bump> &bumps, vector<double> &coordinates){
+void ParseBump(const string &inputPath, vector<Bump> &bumps, vector<double> &coordinates){ 
     ifstream file(inputPath);
     if(!file.is_open()) throw runtime_error("[ParseBump] Failed to open bump file: " + inputPath);
 
@@ -11,6 +11,7 @@ void ParseBump(const string &inputPath, vector<Bump> &bumps, vector<double> &coo
     bumps.clear() ; coordinates.clear() ; 
 
     for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
         istringstream iss(line);
         
         if(lineNumber<=2){
@@ -26,12 +27,15 @@ void ParseBump(const string &inputPath, vector<Bump> &bumps, vector<double> &coo
 }
 
 void ParseDesignRule(const string &inputPath, DesignRule &designRule){
+    
     ifstream file(inputPath);
     if(!file.is_open()) throw runtime_error("[ParseDesignRule] Failed to open design rule file: " + inputPath);
 
     string line;
     
     for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
+
         istringstream iss(line);
         string key;
         if (!(iss >> key)) throw runtime_error("[ParseDesignRule] Error parsing in line #" + to_string(lineNumber)) ;
@@ -71,6 +75,7 @@ void ParseOffsetBump(const string &inputPath, vector<Bump> &bumps, vector<Bump> 
 
     bumps.clear() ; matchedBumps.clear() ;
     for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
         istringstream iss(line);
         
         if (!(iss >> dieName >> type >> id >> x1 >> y1 >> x2 >> y2 )) throw runtime_error("[ParseOffsetBump] Error parsing in line #" + to_string(lineNumber)) ;
@@ -82,6 +87,8 @@ void ParseOffsetBump(const string &inputPath, vector<Bump> &bumps, vector<Bump> 
 }
 
 void ParseNet(const string &inputPath, vector<Net> &nets){
+    
+
     ifstream file(inputPath);
     if(!file.is_open()) throw runtime_error("[ParseNet] Failed to open netlist file: " + inputPath);
 
@@ -92,6 +99,7 @@ void ParseNet(const string &inputPath, vector<Net> &nets){
 
     nets.clear() ; 
     for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
         istringstream iss(line);
         if (!(iss >> netName >> x1 >> y1 >> x2 >> y2 )) throw runtime_error("[ParseNet] Error parsing in line #" + to_string(lineNumber)) ;
         if(usedName.find(netName)==usedName.end()){
@@ -113,6 +121,8 @@ void ParseTeardrop(const string &inputPath, vector<tuple<Bump, double, double, d
 
     teardrops.clear() ; 
     for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
+
         istringstream iss(line);
         if (!(iss >> dieName >> type >> id >> x1 >> y1 >> x2 >> y2 )) throw runtime_error("[ParseTeardrop] Error parsing in line #" + to_string(lineNumber)) ;
         teardrops.push_back({{dieName, Str2DieType(type), id, x1, y1}, x1, y1, x2, y2}) ; //x1, y1是bump位置, x2, y2是目標線段起點的位置

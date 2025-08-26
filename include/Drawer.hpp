@@ -44,21 +44,6 @@ using box = bg::model::box<point>;
 using value = std::pair<box, size_t>;
 using namespace std;
 
-// 畫 bump layer
-void QtDrawBump(QGraphicsScene *scene, vector<Bump> &bumps, vector<double> &routing_area_coordinate, DesignRule designRule);
-
-// // 畫 VSS bump 和 VDD bump
-// void drawPG(QGraphicsScene *scene, vector<Bump> &bumps);
-
-// // 畫 routing area
-// void drawRoutingArea(QGraphicsScene *scene, vector<double> &routing_area_coordinate);
-
-// // 畫 RDL layer
-// void QtDrawRDL(QGraphicsScene *scene, vector<Bump> &vias, vector<double> &routing_area_coordinate, DesignRule designRule, const string &netlistFile, vector<pair<double, double>>& triangleEdgeSource, vector<pair<double, double>>& triangleEdgeTarget, vector<Bump>& offset_vias, RoutingGraph& RDL, vector<wireLength>& wireLengths);
-
-// // 畫 via offset (橢圓形結構)
-// void QtDrawOffsetVia(QGraphicsScene *scene, vector<Bump>& offset_vias, DesignRule designRule);
-
 class Drawer {
 private:
     bg::strategy::buffer::distance_symmetric<double> viaRadiutStrategy = bg::strategy::buffer::distance_symmetric<double>(0.0) ;
@@ -73,18 +58,19 @@ private:
     const DesignRule *designRule = nullptr ;
     QGraphicsScene *scene = nullptr ;
 
-    void _DrawTeardrop(const point& center1, const point& center2) ;
+    void _DrawTeardrop(const point& center1, const point& center2) ; // 後端負責畫Teardrop的函數, 給定兩個座標點即可畫出由center1->center2的Teardrop
     
 public:
     Drawer(const DesignRule *designRule=nullptr, QGraphicsScene *scene=nullptr) ;
-    void SetDesignRule(const DesignRule *designRule) ; 
-    void SetDesignScence(QGraphicsScene *scene) ; 
+    void SetDesignRule(const DesignRule *designRule) ; // 設定Design rule, 並根據規則生成緩衝區策略
+    void SetDesignScence(QGraphicsScene *scene) ; // 設定要畫的QT場景
 
-    void DrawBump(const Bump &bump, Qt::GlobalColor bumpColor=Qt::yellow) ; // yellow for default indiactor (will use other colors to show bumps)
-    void DrawOffsetBump(const Bump &bump, const Bump &matchedBump) ;
-    void DrawNet(const Net& net, Qt::GlobalColor bumpColor=Qt::yellow) ; // 目前只能塗特定顏色, 因為net list資訊刮
-    void DrawTeardrop(const tuple<Bump, double, double, double, double>& teardrop) ; 
-    void DrawDieBoundary(const vector<double>& coordinate) ;
+    void DrawBump(const Bump &bump, Qt::GlobalColor bumpColor=Qt::yellow) ; // 畫單個Bump, bumpColor可以指定顏色, 當bumpColor為黃色時會根據Bump的種類畫預設的顏色(e.g. 不能畫黃色的Bump)
+    void DrawOffsetBump(const Bump &bump, const Bump &matchedBump) ; // 畫一組Bump與其Offset via, 只能畫預設顏色, 顏色較深的為Offset via, 反之為Bump
+    void DrawNet(const Net& net, Qt::GlobalColor netColor=Qt::yellow) ; // 畫單條Net, netColor可以指定顏色, 當netColor為黃色時會根據Net的種類畫預設的顏色(e.g. 不能畫黃色的Net)
+    void DrawTeardrop(const tuple<Bump, double, double, double, double>& teardrop) ; // 畫一顆Teardrop
+    void DrawDieBoundary(const vector<double>& coordinate) ; // 畫Die的邊界, 目前邊界僅為參考用
+
     // void DrawOneRDL(vector<Bump> &bumps, vector<double> &coordinate) ; 
     // void DrawAllRDL(vector<Bump> &bumps, vector<double> &coordinate) ; 
 } ;
