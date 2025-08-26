@@ -23,6 +23,9 @@ ostream& operator<<(ostream& os, const Net& bump) ;
 string DieType2Str(const DieType& type) ;
 DieType Str2DieType(const string& str) ;
 
+string Bump2Str(const Bump& bump) ;
+string Bump2Net(const Net& net) ;
+
 class Bump {
 public:
     Bump(const string& name="", DieType type=DUMMY, int id=-1, double x=0.0, double y=0.0) : name(name), type(type), id(id), x(x), y(y) {};

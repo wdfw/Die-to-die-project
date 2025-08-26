@@ -10,7 +10,6 @@
 //Drawer.hppㄧ定要include在最上層
 
 using namespace std ; 
-namespace bg = boost::geometry ;
 
 int main(int argc, char *argv[]) {
 
@@ -22,7 +21,7 @@ int main(int argc, char *argv[]) {
 
     string bumpFilePath = argv[1] ; 
     string designRulePath = argv[2] ;
-    string outputDirectories = argv[2] ;
+    string outputDirectories = argv[3] ;
 
     DesignRule designRule ; 
     vector<Bump> allBumps, die1Bumps, die2Bumps ; 
@@ -32,17 +31,18 @@ int main(int argc, char *argv[]) {
 
     ParseBump(bumpFilePath, allBumps, coordinate) ;
     ParseDesignRule(designRulePath, designRule) ;
-    
-    copy_if(allBumps.begin(), allBumps.end(), die1Bumps.begin(), [](const Bump& bump){return bump.name=="DIE1"; })
-    copy_if(allBumps.begin(), allBumps.end(), die2Bumps.begin(), [](const Bump& bump){return bump.name=="DIE2"; })
 
-    // num_of_layers = routingGuideGenerate(bumps, coordinate, designRule, outputDirectories, allRDL, offset, GlobalRouteTime);
+    GlobalRoute(allBumps, coordinate, designRule, outputDirectories, allRDL, 0, globalRouteTimes);
 
     return 0 ;
 }
 // 目前假設情境
 // 1. DIE1在DIE2左邊
-
+// 2. DIE1與DIE2之間的escape space大於相鄰2點的最小X距離
 
 //./bin/D2D case/d2d_case_bump.location case/design.rule d2d_result 48
 //./bin/D2D case/d2d_case_bump.location case/design.rule wu_result/ 
+
+//./bin/ShowResult result/ case/design.rule
+
+//./bin/ShowResult wu_result/ case/design.rule

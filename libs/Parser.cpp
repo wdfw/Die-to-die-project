@@ -14,12 +14,9 @@ void ParseBump(const string &inputPath, vector<Bump> &bumps, vector<double> &coo
         if((line = Strip(line)).empty()) continue ;
         istringstream iss(line);
         
-        if(lineNumber<=2){
-            //設置Die的邊界
-            if (!(iss >> v1 >> v2)) throw runtime_error("[ParseBump] Error parsing in line #" + to_string(lineNumber)) ;
+        if(lineNumber<=2 && (iss >> v1 >> v2)){
             coordinates.push_back(v1) ; coordinates.push_back(v2) ;
         }else{
-            //設置Bump的種類與位置
             if (!(iss >> dieName >> type >> id >> x >> y )) throw runtime_error("[ParseBump] Error parsing in line #" + to_string(lineNumber)) ;
             bumps.emplace_back(dieName, Str2DieType(type), id, x, y);
         }

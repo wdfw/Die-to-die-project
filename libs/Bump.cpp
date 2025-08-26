@@ -7,6 +7,9 @@ ostream& operator<<(ostream& os, const Bump& bump){
     return os ; 
 }
 
+string Bump2Str(const Bump& bump){
+    return bump.name + " " + DieType2Str(bump.type) + " " + to_string(bump.id) + " " + to_string(bump.x) + " " + to_string(bump.y) ;
+}
 //------------------------------------------ Bump Method End ------------------------------------------ 
 
 //------------------------------------------ Net Method Begin ------------------------------------------ 
@@ -17,14 +20,18 @@ ostream& operator<<(ostream& os, const Net& bump){
     return os ;
 }
 
+string Bump2Net(const Net& net){
+    //TODO
+    return "" ;
+}
 //------------------------------------------ Net Method Begin ------------------------------------------ 
 
 string DieType2Str(const DieType& type){
     switch (type){
         case DUMMY : return "Dummy" ;
-        case SIGNAL :  return "Signal" ;
-        case VDD :  return "Vdd" ;
-        case VSS :  return "Vss" ;
+        case SIGNAL :  return "SIG" ;
+        case VDD :  return "VDD" ;
+        case VSS :  return "VSS" ;
     }
     return "UNKNOWN" ;
 }

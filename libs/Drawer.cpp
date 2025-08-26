@@ -2,7 +2,7 @@
 
 map<DieType, Qt::GlobalColor> BumpColor = {{DUMMY, Qt::gray}, {SIGNAL, Qt::red}, {VDD, Qt::blue}, {VSS, Qt::green}} ;
 map<DieType, Qt::GlobalColor> OffsetBumpColor = {{DUMMY, Qt::darkGray}, {SIGNAL, Qt::darkRed}, {VDD, Qt::darkBlue}, {VSS, Qt::darkGreen}} ;
-map<string, Qt::GlobalColor> NetColor = {{"power", Qt::blue}, {"ground", Qt::green}, {"Net", Qt::red}} ;
+map<string, Qt::GlobalColor> NetColor = {{"dummy", Qt::gray}, {"power", Qt::blue}, {"ground", Qt::green}, {"Net", Qt::red}} ;
 
 //-------------------------------------------------------------------------------------
 Drawer::Drawer(const DesignRule *designRule, QGraphicsScene *scene){

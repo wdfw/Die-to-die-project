@@ -1,5 +1,23 @@
 #include "Utils.hpp"
 
+
+Timer::Timer() {
+    SetClock();
+}
+
+void Timer::SetClock() {
+    _clock_time = chrono::steady_clock::now();
+}
+
+clock_t Timer::GetDurationSeconds() const {
+    return chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - _clock_time).count();
+}
+
+clock_t Timer::GetDurationMilliseconds() const {
+    return chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - _clock_time).count();
+}
+
+
 string Strip(const string& str){
     int l=0, r=str.size(), f=0 ; 
     for(int i=0; i<str.size(); i++){
