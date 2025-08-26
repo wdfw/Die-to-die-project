@@ -1,6 +1,5 @@
 #pragma once
 
-
 // 定義 Via Node
 struct ViaNode {
     string dieName;

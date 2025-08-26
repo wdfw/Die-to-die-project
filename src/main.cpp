@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 }
 // 目前假設情境
 // 1. DIE1在DIE2左邊
-// 2. DIE1與DIE2之間的escape space大於相鄰2點的最小X距離
+// 2. DIE1與DIE2之的間距大於相鄰 bumps 最小X距離
 
 //./bin/D2D case/d2d_case_bump.location case/design.rule d2d_result 48
 //./bin/D2D case/d2d_case_bump.location case/design.rule wu_result/ 

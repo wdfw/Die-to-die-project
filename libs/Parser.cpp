@@ -17,6 +17,7 @@ void ParseBump(const string &inputPath, vector<Bump> &bumps, vector<double> &coo
         if(lineNumber<=2 && (iss >> v1 >> v2)){
             coordinates.push_back(v1) ; coordinates.push_back(v2) ;
         }else{
+            istringstream iss(line);
             if (!(iss >> dieName >> type >> id >> x >> y )) throw runtime_error("[ParseBump] Error parsing in line #" + to_string(lineNumber)) ;
             bumps.emplace_back(dieName, Str2DieType(type), id, x, y);
         }

@@ -43,7 +43,6 @@ int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routing_area_co
         ConstructRoutingGraph(bumps, routing_area_coordinate, designRule, dirPath, Hor_SPACING_X, layer, allRDL);
 
         globalRouteTimes.push_back(timer.GetDurationMilliseconds()); // **記錄每層的 Global Route 時間**
-        cout << timer.GetDurationMilliseconds() << "\n" ;
         leftBumpCount = 0 ;
         // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
 
