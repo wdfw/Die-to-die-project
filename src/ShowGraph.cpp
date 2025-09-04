@@ -34,11 +34,15 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
 
     ParseDesignRule(designRulePath, designRule) ; drawer.SetDesignRule(&designRule) ;
 
+    //畫基板bumps
     drawer.SetDesignScence(sceneCache[0]) ;
     ParseBump(RDLDirectories[0] + "/via_layer_" + GetTrailingNumber(RDLDirectories[0]), bumps, coordinate) ;
     for(int i=0; i<bumps.size(); i++) drawer.DrawBump(bumps[i]) ; 
 
+    //根據不同層的檔案畫圖(順序不能改)
     for(int i=0; i<RDLDirectories.size(); i++){
+        drawer.SetDesignScence(sceneCache[i+1]) ;
+
         string dir = RDLDirectories[i] ;
         string layerNumber = GetTrailingNumber(dir) ; //取得RDLX的數字部分(e.g. X的部分)
 
@@ -48,34 +52,37 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
         teardropPath = dir + "/teardrop_" + layerNumber ; 
         triangulationPath = dir + "/triangulation_edge" ;
 
-        drawer.SetDesignScence(sceneCache[i+1]) ;
         
+        //畫德勞尼三角形
         if(filesystem::exists(triangulationPath)){
             ParseTriangulation(triangulationPath, triangulationEdges) ;
             for(int i=0; i<triangulationEdges.size(); i++) drawer.DrawTriangulation(triangulationEdges[i]) ;
         }
 
+        //畫淚滴
         if(filesystem::exists(teardropPath)){
             ParseTeardrop(teardropPath, teardrops) ;
             for(int i=0; i<teardrops.size(); i++) drawer.DrawTeardrop(teardrops[i]) ;
         }
 
+        //畫bumps
         if(filesystem::exists(viaPath)){
             ParseBump(viaPath, bumps, coordinate) ;
             for(int i=0; i<bumps.size(); i++) drawer.DrawBump(bumps[i]) ; 
             // drawer.DrawDieBoundary(coordinate) ; //檔案中die boundary僅參考用, 所以不畫了
         }
 
+        //畫offest vias
         if(filesystem::exists(offsetViaPath)){
             ParseOffsetBump(offsetViaPath, offsetBumps1, offsetBumps2) ;
             for(int i=0; i<offsetBumps1.size(); i++) drawer.DrawOffsetBump(offsetBumps1[i], offsetBumps2[i]) ; 
         }
 
+        //畫net list 
         if(filesystem::exists(netListPath)){
             ParseNet(netListPath, nets) ;
             for(int i=0; i<nets.size(); i++) drawer.DrawNet(nets[i]) ;
         }
-
     }
 }
 
@@ -125,21 +132,21 @@ int main(int argc, char *argv[]) {
     }
 
     // 生成執行reload的按鈕
-    QPushButton *reloadButton = new QPushButton("Reload");
+    QPushButton *reloadButton = new QPushButton("Reload") ;
     QObject::connect(reloadButton, &QPushButton::clicked, [&RDLDirectories, &designRulePath, &sceneCache](){ Reload(RDLDirectories, designRulePath, sceneCache); });
-    buttonLayout->addWidget(reloadButton);
+    buttonLayout->addWidget(reloadButton) ;
 
     // 創建主窗口布局
-    layout->addWidget(&view);
-    layout->addLayout(buttonLayout);
-    mainWidget.setLayout(layout);
+    layout->addWidget(&view) ;
+    layout->addLayout(buttonLayout) ;
+    mainWidget.setLayout(layout) ;
 
     // 顯示主窗口
-    mainWidget.resize(1000, 1000);
-    mainWidget.show();
+    mainWidget.resize(1000, 1000) ;
+    mainWidget.show() ;
     
     // 先自動載入一次, 之後可以點擊reload來重載
-    Reload(RDLDirectories, designRulePath, sceneCache);
+    Reload(RDLDirectories, designRulePath, sceneCache) ;
 
     return app.exec();
     

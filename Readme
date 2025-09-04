@@ -1,0 +1,10 @@
+編譯方法
+1. 把CMake_ShowGraph.txt取代CMakeLists.txt的內容
+2. $ cmake . 
+2. $ make 
+
+#ShowResult使用方法
+$ ./ShowResult input_folder design_rule 
+    使用後會根據資料夾中有的檔案與規則生成GUI
+EX: 
+$ ./bin/ShowResult wu_result/ case/design.rule

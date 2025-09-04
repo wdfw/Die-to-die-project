@@ -3,66 +3,63 @@
 const double EPSILON_Y = 1e-6 ;
 const double EPSILON_X = 1e-3;
 
-int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routing_area_coordinate, 
-                const DesignRule& designRule, const string& output_path, vector<RoutingGraph>& allRDL, 
+int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routingCoordinate, 
+                const DesignRule& designRule, const string& outputDirectories, vector<RoutingGraph>& allRDL, 
                 double offset, vector<clock_t>& globalRouteTimes){
 
     vector<Bump> die1Bumps, die2Bumps ; 
     vector<Bump> marginalBumps ;
     
-    double min_y = numeric_limits<double>::max() ;
-    double Hor_SPACING_X ; 
+    double horizontalSpace, minY = numeric_limits<double>::max() ; 
     
-    string dirPath ; 
-    
+    string directoryPath ; 
     Timer timer;
-
+    
+    //找出最左邊的Signal bumps
     for(const auto& bump : bumps){
         if(bump.type == SIGNAL){
-            if(bump.y<min_y){
-                min_y = bump.y ;
+            if(bump.y<minY){
+                minY = bump.y ;
                 marginalBumps.clear() ; 
             }
-            if(fabs(bump.y - min_y) < EPSILON_Y){
+            if(fabs(bump.y - minY) < EPSILON_Y){
                marginalBumps.push_back(bump) ;
             }
         }
     }
+
     sort(marginalBumps.begin(), marginalBumps.end(), [](const Bump& a, const Bump& b) {return a.x < b.x;}) ;
 
-    Hor_SPACING_X = marginalBumps[1].x - marginalBumps[0].x ; 
+    horizontalSpace = marginalBumps[1].x - marginalBumps[0].x ; 
 
     for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
-        dirPath = output_path + "RDL" + to_string(layer) + "/";
+        directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
 
-        if (!filesystem::exists(dirPath)) filesystem::create_directories(dirPath);
-
+        if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
         timer.SetClock() ;
-        
-        ConstructRoutingGraph(bumps, routing_area_coordinate, designRule, dirPath, Hor_SPACING_X, layer, allRDL);
+        ConstructRoutingGraph(bumps, routingCoordinate, designRule, directoryPath, horizontalSpace, layer, allRDL);
+        globalRouteTimes.push_back(timer.GetDurationMilliseconds()); 
 
-        globalRouteTimes.push_back(timer.GetDurationMilliseconds()); // **記錄每層的 Global Route 時間**
         leftBumpCount = 0 ;
         // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
-
     }
 
-    return globalRouteTimes.size() ; 
+    return globalRouteTimes.size() ; // return #layers
 }
 
-void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routing_area_coordinate, const DesignRule& designRule, const string& output_path, double Hor_SPACING_X, int layer, vector<RoutingGraph>& allRDL){
+void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routingCoordinate, const DesignRule& designRule, const string& output_path, double Hor_SPACING_X, int layer, vector<RoutingGraph>& allRDL){
     RoutingGraph RDL1, RDL2 ; 
     
     vector<Bump> die1Bumps, die2Bumps ; 
     vector<Bump> die1LeftmostBumps, die2LeftmostBumps ; // = FindLeftmostInEachRow(bumps);
-    vector<Bump> die1DummyBumps, die2DummyBumps ; // = ProcessLeftAndRight(bumps, leftmostBumps, routing_area_coordinate, Hor_SPACING_X);
+    vector<Bump> die1DummyBumps, die2DummyBumps ; // = ProcessLeftAndRight(bumps, leftmostBumps, routingCoordinate, Hor_SPACING_X);
     vector<double> die1Coordinate, die2Coordinate ; 
 
     ofstream outputViaFile, outputTriangulationFile ; 
     //未來需要調整的部分!!!
-    die1Coordinate = routing_area_coordinate ; die1Coordinate[2] = routing_area_coordinate[2]/2 - Hor_SPACING_X ; 
-    die2Coordinate = routing_area_coordinate ; die2Coordinate[0] = routing_area_coordinate[2]/2 + Hor_SPACING_X ; 
+    die1Coordinate = routingCoordinate ; die1Coordinate[2] = routingCoordinate[2]/2 - Hor_SPACING_X ; 
+    die2Coordinate = routingCoordinate ; die2Coordinate[0] = routingCoordinate[2]/2 + Hor_SPACING_X ; 
 
     copy_if(bumps.begin(), bumps.end(), back_inserter(die1Bumps), [](const Bump& bump){return bump.name=="DIE1"; }) ;
     copy_if(bumps.begin(), bumps.end(), back_inserter(die2Bumps), [](const Bump& bump){return bump.name=="DIE2"; }) ;
@@ -80,8 +77,6 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     for(auto& bump : die2DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
     outputViaFile.close() ;
 
-
-
     for(auto bump : die1Bumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
     for(auto bump : die1DummyBumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
 
@@ -96,7 +91,6 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     for(auto& edgeNode : RDL1.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     for(auto& edgeNode : RDL2.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     outputTriangulationFile.close() ;
-
 }
 
 vector<Bump> ProcessLeftAndRight(const vector<Bump>& bumps, const vector<Bump>& leftmostBumps, const vector<double>& coordinate, double Hor_SPACING_X){
