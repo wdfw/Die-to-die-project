@@ -2,6 +2,8 @@
 
 const double EPSILON_Y = 1e-6 ;
 const double EPSILON_X = 1e-3;
+vector<Bump> debugBumps ; 
+vector<EdgeNode> debugEdges ; 
 
 int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routingCoordinate, 
                 const DesignRule& designRule, const string& outputDirectories, vector<RoutingGraph>& allRDL, 
@@ -70,13 +72,6 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     die1DummyBumps = ProcessLeftAndRight(die1Bumps, die1LeftmostBumps, die1Coordinate, Hor_SPACING_X) ;
     die2DummyBumps = ProcessLeftAndRight(die2Bumps, die2LeftmostBumps, die2Coordinate, Hor_SPACING_X) ;
 
-    outputViaFile.open(output_path + "via_layer_" + to_string(layer)) ;
-    for(auto& bump : die1Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
-    for(auto& bump : die2Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
-    for(auto& bump : die1DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
-    for(auto& bump : die2DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
-    outputViaFile.close() ;
-
     for(auto bump : die1Bumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
     for(auto bump : die1DummyBumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
 
@@ -87,10 +82,45 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     RDL1.edge_nodes = Triangulation(RDL1.via_nodes, designRule);
     RDL2.edge_nodes = Triangulation(RDL2.via_nodes, designRule);
     
+    
+    FindAdjacentViaNodes(RDL1) ; //!!!!!
+    FindAdjacentViaNodes(RDL2) ; //!!!!!
+
+    AddAccessViaEdges(RDL1);
+    AddAccessViaEdges(RDL2);
+
+    outputViaFile.open(output_path + "via_layer_" + to_string(layer)) ;
+    for(auto& bump : die1Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : die2Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : die1DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : die2DummyBumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    for(auto& bump : debugBumps) outputViaFile << Bump2Str(bump) << "\n" ;
+    outputViaFile.close() ;
+
     outputTriangulationFile.open(output_path + "triangulation_edge");
     for(auto& edgeNode : RDL1.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     for(auto& edgeNode : RDL2.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
+    for(auto& edgeNode : debugEdges) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     outputTriangulationFile.close() ;
+}
+
+vector<EdgeNode*> FindAdjacentEdgeNodes(ViaNode &via, vector<EdgeNode> &edge_nodes) {
+    vector<EdgeNode*> adjacent_edges;
+    
+    for (auto &edge : edge_nodes) {
+        // 取出 edge 的兩端 ViaNode
+        ViaNode &via1 = edge.vias[0];
+        ViaNode &via2 = edge.vias[1];
+
+        // **檢查 EdgeNode 是否與 ViaNode 相鄰**
+        bool connects_to_via = ((via1.dieName == via.dieName && via1.type == via.type && via1.id == via.id) ||
+                                (via2.dieName == via.dieName && via2.type == via.type && via2.id == via.id));
+        if (connects_to_via) 
+            adjacent_edges.push_back(&edge);
+        
+    }
+
+    return adjacent_edges;
 }
 
 vector<Bump> ProcessLeftAndRight(const vector<Bump>& bumps, const vector<Bump>& leftmostBumps, const vector<double>& coordinate, double Hor_SPACING_X){
@@ -175,7 +205,114 @@ vector<Bump> FindLeftmostInEachRow(const vector<Bump>& bumps) {
 
     return result;
 }
+bool f = false ; 
+void FindAdjacentViaNodes(RoutingGraph &RDL){
+    int n = RDL.edge_nodes.size() ; 
 
+    for(int i=0; i<n; i++){
+        for(int j=i+1; j<n; j++){
+            for(int k=j+1; k<n; k++){
+                
+                map<pair<DieType, int>, int> countID, countY ; 
+                map<pair<DieType, int>, ViaNode> uniqueVias ; 
+                double aveX = 0.0, aveY = 0.0 ;
+                bool isClosed = true ;
+                
+                ++ countID[{RDL.edge_nodes[i].vias[0].type, RDL.edge_nodes[i].vias[0].id}] ;
+                ++ countID[{RDL.edge_nodes[j].vias[0].type, RDL.edge_nodes[j].vias[0].id}] ;
+                ++ countID[{RDL.edge_nodes[k].vias[0].type, RDL.edge_nodes[k].vias[0].id}] ;
+
+                ++ countID[{RDL.edge_nodes[i].vias[1].type, RDL.edge_nodes[i].vias[1].id}] ;
+                ++ countID[{RDL.edge_nodes[j].vias[1].type, RDL.edge_nodes[j].vias[1].id}] ;
+                ++ countID[{RDL.edge_nodes[k].vias[1].type, RDL.edge_nodes[k].vias[1].id}] ;
+
+                uniqueVias[{RDL.edge_nodes[i].vias[0].type, RDL.edge_nodes[i].vias[0].id}] = RDL.edge_nodes[i].vias[0] ;
+                uniqueVias[{RDL.edge_nodes[j].vias[0].type, RDL.edge_nodes[j].vias[0].id}] = RDL.edge_nodes[j].vias[0] ;
+                uniqueVias[{RDL.edge_nodes[k].vias[0].type, RDL.edge_nodes[k].vias[0].id}] = RDL.edge_nodes[k].vias[0] ;
+
+                uniqueVias[{RDL.edge_nodes[i].vias[1].type, RDL.edge_nodes[i].vias[1].id}] = RDL.edge_nodes[i].vias[1] ;
+                uniqueVias[{RDL.edge_nodes[j].vias[1].type, RDL.edge_nodes[j].vias[1].id}] = RDL.edge_nodes[j].vias[1] ;
+                uniqueVias[{RDL.edge_nodes[k].vias[1].type, RDL.edge_nodes[k].vias[1].id}] = RDL.edge_nodes[k].vias[1] ;
+
+                aveX += RDL.edge_nodes[i].vias[0].x ; 
+                aveX += RDL.edge_nodes[j].vias[0].x ; 
+                aveX += RDL.edge_nodes[k].vias[0].x ; 
+
+                aveX += RDL.edge_nodes[i].vias[1].x ; 
+                aveX += RDL.edge_nodes[j].vias[1].x ; 
+                aveX += RDL.edge_nodes[k].vias[1].x ; 
+
+                aveY += RDL.edge_nodes[i].vias[0].y ; 
+                aveY += RDL.edge_nodes[j].vias[0].y ; 
+                aveY += RDL.edge_nodes[k].vias[0].y ;
+
+                aveY += RDL.edge_nodes[i].vias[1].y ; 
+                aveY += RDL.edge_nodes[j].vias[1].y ; 
+                aveY += RDL.edge_nodes[k].vias[1].y ; 
+
+                for(auto& [v, c] : countID){
+                    if(c!=2) isClosed = false ; 
+                }
+
+                if(isClosed){   
+                    // debugBumps.emplace_back("DUMMY", DUMMY, 0, aveX/6, aveY/6) ;
+                    vector<ViaNode> vias ; 
+                    for(auto& [c, v] : uniqueVias) vias.push_back(v) ;
+
+                    vector<Edge> edges = {
+                        {RDL.edge_nodes[i].id, RDL.edge_nodes[i].vias, RDL.edge_nodes[i].capacity},
+                        {RDL.edge_nodes[j].id, RDL.edge_nodes[j].vias, RDL.edge_nodes[j].capacity},
+                        {RDL.edge_nodes[k].id, RDL.edge_nodes[k].vias, RDL.edge_nodes[k].capacity},
+                    } ;
+
+                    RDL._edge_nodes.emplace_back(RDL._edge_nodes.size(), aveX/6, aveY/6, vias, edges) ;
+                }
+            }
+        }
+    }
+}
+void AddAccessViaEdges(RoutingGraph &RDL) {
+    int current_access_via_id = static_cast<int>(RDL.access_via_edges.size());  // 記錄初始 ID
+    set<tuple<string, DieType, int, int>> unique_access_via_edges; // 確保 (dieName, type, id, edge_id) 唯一
+
+
+    for (auto &via : RDL.via_nodes) {
+        vector<EdgeNode*> adjacent_edges = FindAdjacentEdgeNodes(via, RDL.edge_nodes);
+
+        for (EdgeNode* edge : adjacent_edges) {
+            tuple<string, DieType, int, int> access_via_tuple = {via.dieName, via.type, via.id, edge->id};
+
+            // **如果已經存在，則跳過**
+            if (unique_access_via_edges.find(access_via_tuple) != unique_access_via_edges.end()) {
+                continue;
+            }
+
+            // **新增 AccessViaEdge**
+            RDL.access_via_edges.emplace_back(current_access_via_id++, via, *edge);
+            unique_access_via_edges.insert(access_via_tuple);
+        }
+    }
+
+}
+
+vector<EdgeNode*> findAdjacentEdgeNodes(ViaNode &via, vector<EdgeNode> &edge_nodes) {
+    vector<EdgeNode*> adjacent_edges;
+    
+    for (auto &edge : edge_nodes) {
+        // 取出 edge 的兩端 ViaNode
+        ViaNode &via1 = edge.vias[0];
+        ViaNode &via2 = edge.vias[1];
+
+        // **檢查 EdgeNode 是否與 ViaNode 相鄰**
+        bool connects_to_via = ((via1.dieName == via.dieName && via1.type == via.type && via1.id == via.id) ||
+                                (via2.dieName == via.dieName && via2.type == via.type && via2.id == via.id));
+        if (connects_to_via) 
+            adjacent_edges.push_back(&edge);
+        
+    }
+
+    return adjacent_edges;
+}
 
 vector<EdgeNode> Triangulation(const vector<ViaNode>& via_nodes, const DesignRule& designRule) {
     map<Point, ViaNode> point_to_via;

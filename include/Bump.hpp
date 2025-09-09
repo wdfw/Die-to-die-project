@@ -29,7 +29,6 @@ string Bump2Net(const Net& net) ;
 class Bump {
 public:
     Bump(const string& name="", DieType type=DUMMY, int id=-1, double x=0.0, double y=0.0) : name(name), type(type), id(id), x(x), y(y) {};
-
     string name;
     DieType type;
     int id;
@@ -42,3 +41,5 @@ public:
     string name ;
     Net(const string& name="", const vector<tuple<double,double,double,double>>& sequence=vector<tuple<double,double,double,double>>()) : name(name), vector<tuple<double,double,double,double>>(sequence) {} ;
 } ;
+
+// Bump("Dummy", DUMMY, dummies.size(), current_x, point.y);

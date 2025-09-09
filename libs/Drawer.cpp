@@ -62,7 +62,7 @@ void Drawer::DrawBump(const Bump &bump, Qt::GlobalColor bumpColor){
     }
 
     // 繪製 bump id 文字
-    if (bump.type == SIGNAL){
+    if (1){
         QString label = QString::number(bump.id);
         QGraphicsSimpleTextItem* textItem = new QGraphicsSimpleTextItem(label);
         textItem->setBrush(Qt::white);

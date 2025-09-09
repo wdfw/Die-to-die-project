@@ -1,6 +1,7 @@
 #pragma once
 #include "Bump.hpp"
 
+
 // 定義 Via Node
 struct ViaNode {
     string dieName;
@@ -17,7 +18,7 @@ struct EdgeNode {
     vector<ViaNode> vias;      // 連接的兩個 ViaNode
     int capacity;                      // 邊的容量
     list<string> net_sequence;     // 單向鏈結串列 
-    pair<double, double> start; // 存儲線段的起點
+    pair<double, double> start; // 存儲線段的起點z
     pair<double, double> end;  // 存儲線段的終點
 
     EdgeNode(int id, double x, double y, vector<ViaNode> vias, int capacity)
@@ -45,11 +46,37 @@ struct CrossTileEdge {
 };
 
 
+struct Edge{
+    int id;                       
+    vector<ViaNode> vias;      // 連接的兩個 ViaNode
+    int capacity;                      // 邊的容量
+    pair<double, double> start; // 存儲線段的起點z
+    pair<double, double> end;  // 存儲線段的終點
+
+    Edge(int id, vector<ViaNode> vias, int capacity)
+        : id(id), vias(vias), capacity(capacity) {
+            start = {vias[0].x, vias[0].y} ;
+            end = {vias[1].x, vias[1].y} ;
+        }
+};
+
+struct TruthEdgeNode {
+    int id;                       
+    double x, y;       
+    vector<ViaNode> vias;      // 連接的三個 ViaNode
+    vector<Edge> edges;      // 連接的三個 ViaNode
+
+    TruthEdgeNode(int id, double x, double y, const vector<ViaNode>& vias, const vector<Edge>& edges): id(id), x(x), y(y), vias(vias), edges(edges) {}
+        
+};
 
 class RoutingGraph {
 public:
     vector<ViaNode> via_nodes;              // 所有 Via Nodes
+    
+    vector<TruthEdgeNode> _edge_nodes;            // 所有 Edge Nodes
     vector<EdgeNode> edge_nodes;            // 所有 Edge Nodes
+    
     vector<AccessViaEdge> access_via_edges; // 所有 Access-Via Edges
     vector<CrossTileEdge> cross_tile_edges; // 所有 Cross-Tile Edges
 };

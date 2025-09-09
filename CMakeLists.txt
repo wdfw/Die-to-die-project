@@ -36,9 +36,11 @@ find_package(CGAL REQUIRED COMPONENTS Qt5)
 
 # 自動抓取 main.cpp 以及 src 資料夾底下所有 .cpp
 file(GLOB_RECURSE MAIN_SOURCES
-    "${CMAKE_SOURCE_DIR}/src/mian.cpp"
+    "${CMAKE_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_SOURCE_DIR}/libs/*.cpp"
 )
+#ShowGraph
+#ShowResult
 
 # file(GLOB_RECURSE GEN_SOURCES
 #     "${CMAKE_SOURCE_DIR}/src/BumpGenerator.cpp"
