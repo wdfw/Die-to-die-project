@@ -1,5 +1,6 @@
 #include "Utils.hpp"
 
+//------------------------------------------ Timer Method Begin ------------------------------------------ 
 
 Timer::Timer() {
     SetClock();
@@ -16,6 +17,8 @@ clock_t Timer::GetDurationSeconds() const {
 clock_t Timer::GetDurationMilliseconds() const {
     return chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - _clock_time).count();
 }
+
+//------------------------------------------ Timer Method Begin ------------------------------------------ 
 
 
 string Strip(const string& str){

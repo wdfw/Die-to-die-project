@@ -4,7 +4,8 @@ const double EPSILON_Y = 1e-6 ;
 const double EPSILON_X = 1e-3;
 vector<Bump> debugBumps ; 
 vector<EdgeNode> debugEdges ; 
-
+vector<Net> debugNets ; 
+int coutFlag = 0 ;
 int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routingCoordinate, 
                 const DesignRule& designRule, const string& outputDirectories, vector<RoutingGraph>& allRDL, 
                 double offset, vector<clock_t>& globalRouteTimes){
@@ -33,21 +34,26 @@ int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routingCoordina
     sort(marginalBumps.begin(), marginalBumps.end(), [](const Bump& a, const Bump& b) {return a.x < b.x;}) ;
 
     horizontalSpace = marginalBumps[1].x - marginalBumps[0].x ; 
-
-    for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
-        directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
-
-        if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
-        
-        timer.SetClock() ;
-        ConstructRoutingGraph(bumps, routingCoordinate, designRule, directoryPath, horizontalSpace, layer, allRDL);
-        globalRouteTimes.push_back(timer.GetDurationMilliseconds()); 
-
-        leftBumpCount = 0 ;
-        // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
-    }
-
+    
+    ViaNode2 node(marginalBumps[0]) ; 
+    cout << node << "\n\n" ;
+    cout << marginalBumps[0] << "\n" ;
     return globalRouteTimes.size() ; // return #layers
+    // for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
+    //     directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
+
+    //     if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
+        
+    //     timer.SetClock() ;
+
+    //     // ConstructRoutingGraph(bumps, routingCoordinate, designRule, directoryPath, horizontalSpace, layer, allRDL);
+    //     globalRouteTimes.push_back(timer.GetDurationMilliseconds()); 
+
+    //     leftBumpCount = 0 ;
+    //     // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
+    // }
+
+    // return globalRouteTimes.size() ; // return #layers
 }
 
 void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routingCoordinate, const DesignRule& designRule, const string& output_path, double Hor_SPACING_X, int layer, vector<RoutingGraph>& allRDL){
@@ -58,7 +64,7 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     vector<Bump> die1DummyBumps, die2DummyBumps ; // = ProcessLeftAndRight(bumps, leftmostBumps, routingCoordinate, Hor_SPACING_X);
     vector<double> die1Coordinate, die2Coordinate ; 
 
-    ofstream outputViaFile, outputTriangulationFile ; 
+    ofstream outputViaFile, outputTriangulationFile, outputNetlistFile ; 
     //未來需要調整的部分!!!
     die1Coordinate = routingCoordinate ; die1Coordinate[2] = routingCoordinate[2]/2 - Hor_SPACING_X ; 
     die2Coordinate = routingCoordinate ; die2Coordinate[0] = routingCoordinate[2]/2 + Hor_SPACING_X ; 
@@ -82,12 +88,14 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     RDL1.edge_nodes = Triangulation(RDL1.via_nodes, designRule);
     RDL2.edge_nodes = Triangulation(RDL2.via_nodes, designRule);
     
-    
     FindAdjacentViaNodes(RDL1) ; //!!!!!
     FindAdjacentViaNodes(RDL2) ; //!!!!!
 
-    AddAccessViaEdges(RDL1);
-    AddAccessViaEdges(RDL2);
+    AddAccessViaEdges(RDL1) ;
+    AddAccessViaEdges(RDL2) ;
+
+    AddCrossTileEdges(RDL1, designRule) ;
+    AddCrossTileEdges2(RDL1, designRule) ;
 
     outputViaFile.open(output_path + "via_layer_" + to_string(layer)) ;
     for(auto& bump : die1Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
@@ -102,6 +110,14 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     for(auto& edgeNode : RDL2.edge_nodes) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     for(auto& edgeNode : debugEdges) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     outputTriangulationFile.close() ;
+
+    outputNetlistFile.open(output_path + "netlist_" + to_string(layer));
+    for(auto& net : debugNets){
+        for(auto& seg : net){
+            outputNetlistFile << net.name << " " << get<0>(seg) << " " << get<1>(seg) << " " << get<2>(seg) << " " << get<3>(seg) << "\n" ;
+        }
+    }
+    outputNetlistFile.close() ;
 }
 
 vector<EdgeNode*> FindAdjacentEdgeNodes(ViaNode &via, vector<EdgeNode> &edge_nodes) {
@@ -122,6 +138,193 @@ vector<EdgeNode*> FindAdjacentEdgeNodes(ViaNode &via, vector<EdgeNode> &edge_nod
 
     return adjacent_edges;
 }
+
+
+bool isValidTile(const EdgeNode &A, const EdgeNode &B, const EdgeNode &C) {
+    // 確保 A, B, C 是不同的 EdgeNode
+    if (A.id == B.id || A.id == C.id || B.id == C.id) return false;
+
+    // 找出這三個 EdgeNodes 共同連接的 ViaNode
+    vector<tuple<string, DieType, int>> via_list;
+
+    // **將 A, B, C 連結的 ViaNode 加入 via_list**
+    for (const auto &via : A.vias) via_list.push_back(tuple<string, DieType, int>{via.dieName, via.type, via.id});
+    for (const auto &via : B.vias) via_list.push_back(tuple<string, DieType, int>{via.dieName, via.type, via.id});
+    for (const auto &via : C.vias) via_list.push_back(tuple<string, DieType, int>{via.dieName, via.type, via.id});
+
+    // **對 via_list 進行排序，確保相同的 ViaNode 會相鄰**
+    sort(via_list.begin(), via_list.end());
+
+    // **使用 unique 去除重複元素**
+    via_list.erase(unique(via_list.begin(), via_list.end()), via_list.end());
+
+    // **確保這三個 EdgeNodes 共享 3 個獨特的 ViaNodes**
+    if (via_list.size() != 3) return false;
+
+    return true;
+}
+
+
+tuple<ViaNode, ViaNode, ViaNode> findSharedViaNodes(const EdgeNode &A, const EdgeNode &B, const EdgeNode &C) {
+    map<tuple<string, DieType, int>, ViaNode> via_map; // 用來確保 ViaNode 唯一性
+    map<tuple<string, DieType, int>, int> via_count; // 記錄 ViaNode 出現次數
+
+    // **計算 ViaNode 出現次數**
+    for (const auto &via : A.vias) {
+        via_map[{via.dieName, via.type, via.id}] = via;
+        via_count[{via.dieName, via.type, via.id}]++;
+    }
+    for (const auto &via : B.vias) {
+        via_map[{via.dieName, via.type, via.id}] = via;
+        via_count[{via.dieName, via.type, via.id}]++;
+    }
+    for (const auto &via : C.vias) {
+        via_map[{via.dieName, via.type, via.id}] = via;
+        via_count[{via.dieName, via.type, via.id}]++;
+    }
+
+    // **篩選出所有共享的 ViaNodes**
+    vector<ViaNode> shared_vias;
+    for (const auto &[key, count] : via_count) {
+        if (count == 2) { // 只加入出現兩次的 ViaNode
+            shared_vias.push_back(via_map[key]);
+        }
+    }
+
+    // **確保有 3 個共享的 ViaNode**
+    if (shared_vias.size() != 3) {
+        return {ViaNode(), ViaNode(), ViaNode()}; // 返回無效的 ViaNode
+    }
+
+    // **確保 shared_vias 對應到正確的 EdgeNode**
+    ViaNode via_AB, via_BC, via_CA;
+    for (const auto &via : shared_vias) {
+        bool in_A = false, in_B = false, in_C = false;
+        for (const auto &v : A.vias) {
+            if (v.dieName == via.dieName && v.type == via.type && v.id == via.id) in_A = true;
+        }
+        for (const auto &v : B.vias) {
+            if (v.dieName == via.dieName && v.type == via.type && v.id == via.id) in_B = true;
+        }
+        for (const auto &v : C.vias) {
+            if (v.dieName == via.dieName && v.type == via.type && v.id == via.id) in_C = true;
+        }
+
+        if (in_A && in_B) via_AB = via;
+        else if (in_B && in_C) via_BC = via;
+        else if (in_C && in_A) via_CA = via;
+    }
+
+    return {via_AB, via_BC, via_CA};
+}
+
+double calculateAngle(const ViaNode &V, const EdgeNode &E1, const EdgeNode &E2) {
+    // 向量 V → E1
+    double vecA_x = E1.x - V.x;
+    double vecA_y = E1.y - V.y;
+
+    // 向量 V → E2
+    double vecB_x = E2.x - V.x;
+    double vecB_y = E2.y - V.y;
+
+    // 計算內積
+    double dot_product = (vecA_x * vecB_x) + (vecA_y * vecB_y);
+
+    // 計算向量長度
+    double lenA = sqrt(vecA_x * vecA_x + vecA_y * vecA_y);
+    double lenB = sqrt(vecB_x * vecB_x + vecB_y * vecB_y);
+
+    // **計算角度**
+    double angle = acos(dot_product / (lenA * lenB)) * 180.0 / M_PI;  
+
+    return angle;  // 回傳角度 (degree)
+}
+void AddCrossTileEdges2(RoutingGraph &RDL, DesignRule designRule) {
+    for (auto &edge_A : RDL.edge_nodes){
+        
+    }
+}
+void AddCrossTileEdges(RoutingGraph &RDL, DesignRule designRule) {
+    int cross_tile_id = static_cast<int>(RDL.cross_tile_edges.size());  // 記錄初始 ID
+    unordered_set<string> added_tiles;  // 避免重複加入 Tile
+    unordered_set<string> added_edges;  // 避免重複加入個別 Cross-Tile Edge
+    
+    // **遍歷所有 EdgeNode A**
+    for (auto &edge_A : RDL.edge_nodes) {
+        vector<EdgeNode*> potential_edges;
+        
+        // **找到所有透過 `AccessViaEdge` 連接到 EdgeNode A 的 ViaNodes**
+        for (auto &access_via : RDL.access_via_edges) {
+            if (access_via.edge.id == edge_A.id) {  
+                ViaNode via = access_via.via;
+
+                // **找到與此 ViaNode 連結的其他 EdgeNodes**
+                for (auto &other_access_via : RDL.access_via_edges) {
+                    if (other_access_via.edge.id != edge_A.id && 
+                        other_access_via.via.dieName == via.dieName && 
+                        other_access_via.via.type == via.type && 
+                        other_access_via.via.id == via.id) 
+                    {
+                        if(coutFlag<10){
+                            ++coutFlag ; 
+                            Net A("dummy", {tuple<double,double,double,double>{other_access_via.edge.x, other_access_via.edge.y, via.x, via.y}}) ;
+                            debugNets.push_back(A) ;
+                        }
+                        potential_edges.push_back(&other_access_via.edge);
+                    }
+                }
+            }
+        }
+
+        // **檢查這些 EdgeNodes 是否能形成 Tile**
+        for (size_t i = 0; i < potential_edges.size(); i++) {
+            for (size_t j = i + 1; j < potential_edges.size(); j++) {
+                EdgeNode* edge_B = potential_edges[i];
+                EdgeNode* edge_C = potential_edges[j];
+
+                // **檢查 Edge Node A, B, C 是否能構成 Tile**
+                if (isValidTile(edge_A, *edge_B, *edge_C)) {
+                    // **確保不重複加入該 Tile**
+                    string tile_key = to_string(edge_A.id) + "-" + to_string(edge_B->id) + "-" + to_string(edge_C->id);
+                    if (added_tiles.find(tile_key) == added_tiles.end()) {
+                        // **找出共享的 ViaNodes**
+                        auto [via_AB, via_BC, via_CA] = findSharedViaNodes(edge_A, *edge_B, *edge_C);
+                        double angle_AB = calculateAngle(via_AB, edge_A, *edge_B);
+                        double angle_BC = calculateAngle(via_BC, *edge_B, *edge_C);
+                        double angle_CA = calculateAngle(via_CA, *edge_C, edge_A);
+
+                        // **計算長度**
+                        double length_AB = sqrt(pow(edge_A.x - edge_B->x, 2) + pow(edge_A.y - edge_B->y, 2));
+                        double length_BC = sqrt(pow(edge_B->x - edge_C->x, 2) + pow(edge_B->y - edge_C->y, 2));
+                        double length_CA = sqrt(pow(edge_C->x - edge_A.x, 2) + pow(edge_C->y - edge_A.y, 2));
+
+
+                        // ** 逐個加入 Cross-Tile Edge，確保不重複**
+                        string edge_AB_key = to_string(edge_A.id) + "-" + to_string(edge_B->id);
+                        string edge_BC_key = to_string(edge_B->id) + "-" + to_string(edge_C->id);
+                        string edge_CA_key = to_string(edge_C->id) + "-" + to_string(edge_A.id);
+
+                        if (added_edges.find(edge_AB_key) == added_edges.end()) {
+                            RDL.cross_tile_edges.emplace_back(cross_tile_id++, vector<EdgeNode>{edge_A, *edge_B}, angle_AB);
+                            added_edges.insert(edge_AB_key);
+                        }
+                        if (added_edges.find(edge_BC_key) == added_edges.end()) {
+                            RDL.cross_tile_edges.emplace_back(cross_tile_id++, vector<EdgeNode>{*edge_B, *edge_C}, angle_BC);
+                            added_edges.insert(edge_BC_key);
+                        }
+                        if (added_edges.find(edge_CA_key) == added_edges.end()) {
+                            RDL.cross_tile_edges.emplace_back(cross_tile_id++, vector<EdgeNode>{*edge_C, edge_A}, angle_CA);
+                            added_edges.insert(edge_CA_key);
+                        }
+
+                        added_tiles.insert(tile_key);  // 避免重複
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 vector<Bump> ProcessLeftAndRight(const vector<Bump>& bumps, const vector<Bump>& leftmostBumps, const vector<double>& coordinate, double Hor_SPACING_X){
     double min_x = coordinate[0], max_x = coordinate[2] ;
@@ -295,24 +498,7 @@ void AddAccessViaEdges(RoutingGraph &RDL) {
 
 }
 
-vector<EdgeNode*> findAdjacentEdgeNodes(ViaNode &via, vector<EdgeNode> &edge_nodes) {
-    vector<EdgeNode*> adjacent_edges;
-    
-    for (auto &edge : edge_nodes) {
-        // 取出 edge 的兩端 ViaNode
-        ViaNode &via1 = edge.vias[0];
-        ViaNode &via2 = edge.vias[1];
 
-        // **檢查 EdgeNode 是否與 ViaNode 相鄰**
-        bool connects_to_via = ((via1.dieName == via.dieName && via1.type == via.type && via1.id == via.id) ||
-                                (via2.dieName == via.dieName && via2.type == via.type && via2.id == via.id));
-        if (connects_to_via) 
-            adjacent_edges.push_back(&edge);
-        
-    }
-
-    return adjacent_edges;
-}
 
 vector<EdgeNode> Triangulation(const vector<ViaNode>& via_nodes, const DesignRule& designRule) {
     map<Point, ViaNode> point_to_via;
@@ -460,5 +646,6 @@ vector<EdgeNode> Triangulation(const vector<ViaNode>& via_nodes, const DesignRul
     }
 
     // outFile.close();
+
     return edges;
 }

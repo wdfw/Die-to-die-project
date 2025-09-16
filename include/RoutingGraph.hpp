@@ -67,8 +67,8 @@ struct TruthEdgeNode {
     vector<Edge> edges;      // 連接的三個 ViaNode
 
     TruthEdgeNode(int id, double x, double y, const vector<ViaNode>& vias, const vector<Edge>& edges): id(id), x(x), y(y), vias(vias), edges(edges) {}
-        
 };
+
 
 class RoutingGraph {
 public:
@@ -77,6 +77,7 @@ public:
     vector<TruthEdgeNode> _edge_nodes;            // 所有 Edge Nodes
     vector<EdgeNode> edge_nodes;            // 所有 Edge Nodes
     
-    vector<AccessViaEdge> access_via_edges; // 所有 Access-Via Edges
-    vector<CrossTileEdge> cross_tile_edges; // 所有 Cross-Tile Edges
+    vector<AccessViaEdge> access_via_edges; // 所有 Access-Via Edges // via to tile
+    vector<CrossTileEdge> cross_tile_edges; // 所有 Cross-Tile Edges // tile to tile
 };
+
