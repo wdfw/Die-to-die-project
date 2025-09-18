@@ -35,25 +35,399 @@ int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routingCoordina
 
     horizontalSpace = marginalBumps[1].x - marginalBumps[0].x ; 
     
-    ViaNode2 node(marginalBumps[0]) ; 
-    cout << node << "\n\n" ;
-    cout << marginalBumps[0] << "\n" ;
-    return globalRouteTimes.size() ; // return #layers
-    // for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
-    //     directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
+    for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
+        directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
 
-    //     if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
+        if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
-    //     timer.SetClock() ;
+        timer.SetClock() ;
 
-    //     // ConstructRoutingGraph(bumps, routingCoordinate, designRule, directoryPath, horizontalSpace, layer, allRDL);
-    //     globalRouteTimes.push_back(timer.GetDurationMilliseconds()); 
+        ConstructRoutingGraph(bumps, routingCoordinate, designRule, directoryPath, horizontalSpace, layer, allRDL);
+        globalRouteTimes.push_back(timer.GetDurationMilliseconds()); 
 
-    //     leftBumpCount = 0 ;
-    //     // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
-    // }
+        leftBumpCount = 0 ;
+        // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
+    }
 
-    // return globalRouteTimes.size() ; // return #layers
+    return globalRouteTimes.size() ; // return #layers
+}
+
+
+pair<vector<vector<ViaNode>>, vector<vector<ViaNode>>> findUpperLowerOtherPerRow(const vector<ViaNode>& vias, unordered_map<string, unordered_set<string>>& net_group_map) {
+    map<double, vector<ViaNode>> row_nodes;  // 以 y 座標分類
+    for (const auto& via : vias) {
+        if (via.dieName == "DIE1" && via.type == SIGNAL)
+            row_nodes[via.y].push_back(via);
+    }
+
+    // **結果：分成兩部分**
+    vector<vector<ViaNode>> rightmost_list;  // 最右邊的兩個
+    vector<vector<ViaNode>> remaining_list;  // 其餘的 ViaNode
+
+    for (auto& [y, nodes] : row_nodes) {
+        // **按 x 值排序**
+        sort(nodes.begin(), nodes.end(), [](const ViaNode& a, const ViaNode& b) {
+            return a.x > b.x;  // 由右向左排序
+        });
+
+        int num_nodes = nodes.size();
+        unordered_set<string> row_net_set;  // **存這一列所有 `net_xx`，避免重複處理**
+        
+        for (const auto& node : nodes) {
+            string net_name = "Net_" + to_string(node.id);
+            row_net_set.insert(net_name);
+        }
+
+        // **將這列的 net_xx 加入同一組**
+        for (const auto& net : row_net_set) {
+            net_group_map[net] = row_net_set;  // **將整組直接存入**
+        }
+
+        if (num_nodes > 2) {
+            // **將最右邊兩個加入 rightmost_list**
+            rightmost_list.push_back({nodes[0], nodes[1]});
+
+            // **其餘的加入 remaining_list**
+            remaining_list.push_back(vector<ViaNode>(nodes.begin() + 2, nodes.end()));
+        } else {
+            // **如果只有兩個或更少，全部歸入 rightmost_list**
+            rightmost_list.push_back(nodes);
+            remaining_list.push_back({});
+        }
+    }
+
+    return {rightmost_list, remaining_list};
+}
+
+
+// 根據 direction 找到離 via 最近的 EdgeNode
+EdgeNode* findNearestEdgeNode(const ViaNode& via, vector<EdgeNode>& edge_nodes, const string& direction) { 
+    double min_distance = numeric_limits<double>::max();
+    EdgeNode* nearest_edge = nullptr;
+
+    for (auto& edge : edge_nodes) {
+        // **確保 EdgeNode 其中一端是該 ViaNode**
+        bool has_via = (edge.vias[0].id == via.id && edge.vias[0].type == via.type) ||
+                       (edge.vias[1].id == via.id && edge.vias[1].type == via.type);
+
+        if (!has_via) continue;  // **如果 EdgeNode 兩端都不是該 ViaNode，則跳過**
+
+        // **計算 EdgeNode 的中心點**
+        double edge_x = (edge.vias[0].x + edge.vias[1].x) / 2.0;
+        double edge_y = (edge.vias[0].y + edge.vias[1].y) / 2.0;
+
+        // **計算與 ViaNode 的距離**
+        double distance = sqrt(pow(edge_x - via.x, 2) + pow(edge_y - via.y, 2));
+
+        // **篩選符合方向條件的 EdgeNode**
+        bool valid_edge = false;
+        if (direction == "top-right" && edge_x > via.x && edge_y < via.y) {
+            valid_edge = true;
+        } else if (direction == "bottom-right" && edge_x > via.x && edge_y > via.y) {
+            valid_edge = true;
+        } else if (direction == "bottom-left" && edge_x < via.x && edge_y > via.y) {
+            valid_edge = true;
+        }
+
+
+        if (valid_edge && distance < min_distance) {
+            min_distance = distance;
+            nearest_edge = &edge;
+        }
+    }
+
+    return nearest_edge;
+}
+
+CrossTileEdge* findLargestAngleCrossTileEdge(EdgeNode* current_edge, vector<CrossTileEdge>& cross_tile_edges, RoutingGraph& RDL) {
+    CrossTileEdge* best_edge = nullptr;
+    double max_angle = numeric_limits<double>::min();
+    double max_x = numeric_limits<double>::min();
+    const double EPSILON = 1e-6;
+
+    for (auto& edge : cross_tile_edges) {
+        if (edge.edges[0].id == current_edge->id || edge.edges[1].id == current_edge->id) {
+            // **取得另一個 EdgeNode**
+            EdgeNode* next_edge = (edge.edges[0].id == current_edge->id) ? &edge.edges[1] : &edge.edges[0];
+            
+            double next_x = next_edge->x;  // 找出 X 最大的值
+            
+            //  優先比較 X 最大
+            if (next_x > max_x + EPSILON) {
+                max_x = next_x;
+                max_angle = edge.angle;
+                best_edge = &edge;
+            } else if (fabs(next_x - max_x) < EPSILON && edge.angle > max_angle) { //  若 X 相同（在誤差內），再選擇角度最大 (目前用不到, 因為所有角度都相同)
+                max_angle = edge.angle;
+                best_edge = &edge;
+            }
+        }
+    }
+
+    // cout<< "max_angle: "<<max_angle<<endl;
+
+    return best_edge;
+}
+
+void routeUpperLower(vector<vector<ViaNode>>& rightmost_per_row, RoutingGraph& RDL) {
+    for (size_t row = 0; row < 1; row++) {  //rightmost_per_row.size()
+        int num_nodes = rightmost_per_row[row].size();
+        if (num_nodes == 0) continue; 
+
+        for (size_t i = 0; i < 1; i++) { //num_nodes
+            ViaNode via = rightmost_per_row[row][i];
+
+            cout << "Routing ViaNode: (Row: " << row << ", ID: " << via.id 
+                 << ", Type: " << DieType2Str(via.type) << ", X: " << via.x << ", Y: " << via.y << ")\n";
+
+            // **設定方向**
+            string direction;
+            if (i == 0) {  // 最右邊的 ViaNode => Upper
+                direction = "top-right";
+            } else if (i == 1) {  // 第二個 ViaNode => Lower
+                direction = "bottom-right";
+            } else {  // 其餘所有的 ViaNode
+                direction = "top-right";
+            }
+
+            cout << "Routing Direction: " << direction << "\n\n";
+
+            // **找最近的 EdgeNode**
+            EdgeNode* current_edge = findNearestEdgeNode(via, RDL.edge_nodes, direction);
+            if (!current_edge) {
+                cout << "No suitable EdgeNode found.\n";
+                continue;
+            }
+            
+            // ** 取得 head 和 tail nodes**
+            string head_node = current_edge->net_sequence.front();  // head node
+            string tail_node = current_edge->net_sequence.back();   // tail node
+
+            cout << "EdgeNode ID: " << current_edge->id << endl;
+            cout << "Original Net Sequence: ";
+            for (const auto& node : current_edge->net_sequence) {
+                cout << node << " => ";
+            }
+            cout << "END" << endl;
+
+            list<string> new_sequence;
+            bool inserted = false;
+
+            bool Upper = false; // 用於看 ground 要加在 signal 上還是下
+            // ** 建立 `access`、`net` 和 `ground`**
+            string access = "access";  // 插入 access
+            string net = "Net_" + to_string(via.id);  // Net_viaX
+            string ground = "ground";  // 插入 ground
+
+            for (auto it = current_edge->net_sequence.begin(); it != current_edge->net_sequence.end(); ++it) {
+                // **如果 `via` 是 `tail_node`，先檢查並插入**
+                if (*it == tail_node && tail_node.substr(0, 3)=="SIG" && via.id == stoi(tail_node.substr(4))) { // => upper
+                    auto prev_it = prev(it);  // 取得 tail_node 前一個元素
+                    if (*prev_it != ground) { 
+                        new_sequence.push_back(ground);  // **只在 tail_node 前面插入 ground (若沒有的話)**
+                    }
+                    new_sequence.push_back(net);
+                    new_sequence.push_back(access);
+                    inserted = true;
+                    Upper = true;
+                }
+            
+                // **加入原本的節點**
+                new_sequence.push_back(*it);
+            
+                // **如果 `via` 是 `head_node`，則在 `head_node` 後面插入 `access`、`Net_via`、`ground`**
+                if (*it == head_node && head_node.substr(0, 3)=="SIG" && via.id == stoi(head_node.substr(4))) { // => lower
+                    new_sequence.push_back(access);
+                    new_sequence.push_back(net);
+                    auto next_it = next(it);  // 取得 head_node 後一個元素
+                    if (*next_it != ground) { 
+                        new_sequence.push_back(ground);  // **只在 head_node 後面插入 ground (若沒有的話)**
+                    }
+                    inserted = true;
+                }
+            }
+
+            // **更新 `current_edge->net_sequence`**
+            // -2 是要減去 head 和 tail node
+            int newSize = new_sequence.size() - 2;
+            // **檢查是否有 "access"，若有則再減 1** => access 不算一種 net 
+            int access_count = count(new_sequence.begin(), new_sequence.end(), "access");
+            newSize -= access_count;
+            
+            if(newSize <= current_edge->capacity){
+                current_edge->net_sequence = new_sequence;
+                for (auto& edge : RDL.edge_nodes) {
+                    if (edge.id == current_edge->id) {
+                        edge.net_sequence = new_sequence;  // **確保更新的是 RDL.edge_nodes 內的正確 EdgeNode**
+                        break;
+                    }
+                }
+            }else{
+                cout<<"Capacity is not enough"<<endl;
+                return;
+            }
+            
+
+            // **輸出更新後的 Net Sequence**
+            cout << "Updated Net Sequence: ";
+            for (const auto& node : current_edge->net_sequence) {
+                cout << node << " => ";
+            }
+            cout << "END" << endl;
+
+            bool first_iteration = true;
+            while (true) {
+                cout << "********************\n";
+
+                // **檢查 EdgeNode 連接的 ViaNodes**
+                ViaNode via1 = current_edge->vias[0];
+                ViaNode via2 = current_edge->vias[1];
+
+                // **第一次進入迴圈時，跳過檢查，避免誤判**
+                if (!first_iteration) {
+                    if ((via1.type == via.type && via1.id == via.id) || (via2.type == via.type && via2.id == via.id)) {
+                        cout << "Matching ViaNode found. Routing complete.\n";
+
+                        string viaName = via.type + "_" + to_string(via.id);
+                        
+                        // **找到 net_sequence 的 front 和 back**
+                        auto front_it = current_edge->net_sequence.begin();
+                        auto next_front = next(front_it);
+                        auto back_it = prev(current_edge->net_sequence.end()); // 指向最後一個元素
+                        auto prev_back = prev(back_it);
+
+                        bool modified = false;
+
+                        // ** 檢查 `front` 和 `back`**
+                        if (*front_it == viaName) {  // 檢查 `Net_viaX` 是否在 front
+                            // cout<<"front"<<endl;
+                            current_edge->net_sequence.insert(next(front_it), "access");  // **在 front_it 後面插入 access**
+                            modified = true;
+                            
+                        }else if (*back_it == viaName) {  // 檢查 `Net_viaX` 是否在 back
+                            // cout<<"back"<<endl;
+                            if(*(prev_back) == "ground"){
+                                current_edge->net_sequence.erase(prev_back);
+                            }
+                            current_edge->net_sequence.insert(back_it, "access");  // **在 back_it 前面插入 access**
+                            modified = true;
+                        }
+
+                        // ** 更新 EdgeNode**
+                        if (modified) {
+                            for (auto& edge : RDL.edge_nodes) {
+                                if (edge.id == current_edge->id) {
+                                    edge.net_sequence = current_edge->net_sequence;  // **確保更新的是 RDL.edge_nodes 內的正確 EdgeNode**
+                                    break;
+                                }
+                            }
+
+                            // ** 輸出更新後的 Net Sequence**
+                            cout << "Updated Net Sequence: ";
+                            for (const auto& node : current_edge->net_sequence) {
+                                cout << node << " => ";
+                            }
+                            cout << "END" << endl << endl;
+                        }
+
+
+
+                        break;
+                    }
+                }
+
+                first_iteration = false;
+
+                // ** 選擇角度最大的 CrossTileEdge**
+                CrossTileEdge* next_edge = findLargestAngleCrossTileEdge(current_edge, RDL.cross_tile_edges, RDL);
+                if (!next_edge) {
+                    cout << "No valid CrossTileEdge found. Stopping.\n";
+                    break;
+                }
+
+                // **更新當前 EdgeNode**
+                current_edge = (next_edge->edges[0].id == current_edge->id) ? &next_edge->edges[1] : &next_edge->edges[0];
+
+                for (auto& edge : RDL.edge_nodes) {
+                    if (edge.id == current_edge->id) {
+                        current_edge = &edge;  // **確保更新的是 RDL.edge_nodes 內的正確 EdgeNode**
+                        break;
+                    }
+                }
+
+                // **取得原 tail node**
+                string tail_node = current_edge->net_sequence.back();  // 原本的 tail
+
+                cout << "EdgeNode ID: " << current_edge->id << endl;
+                cout << "Original Net Sequence: ";
+                for (const auto& node : current_edge->net_sequence) {
+                    cout << node << " => ";
+                }
+                cout << "END" << endl;
+
+                // ** 建立 `net` 和 `ground`**
+                string net = "Net_" + to_string(via.id);  // Net_viaX
+                string ground = "ground";  // Ground 繞過 Net_via
+
+                list<string> new_sequence;
+                bool inserted = false;  // 確保只插入一次
+
+                for (auto it = current_edge->net_sequence.begin(); it != current_edge->net_sequence.end(); ++it) {
+                    // **如果當前節點是 tail_node，則在前面插入 `ground`、`Net_xx`、`ground`**
+                    if (*it == tail_node && !inserted) {
+                        // **確保左邊沒有 ground 才插入**
+                        if (Upper && !new_sequence.empty() && new_sequence.back() != ground) {
+                            new_sequence.push_back(ground);
+                        }
+
+                        new_sequence.push_back(net);
+
+                        // **確保 `Net_xx` 和 `tail_node` 之間有 ground**
+                        if ((row==rightmost_per_row.size()-1 && num_nodes==1) || (!Upper && *it != ground)) {
+                            new_sequence.push_back(ground);
+                        }
+
+                        inserted = true;
+                    }
+
+                    // **加入原本的節點**
+                    new_sequence.push_back(*it);
+                }
+
+                // **更新 `current_edge->net_sequence`**
+                // -2 是要減去 head 和 tail node
+                int newSize = new_sequence.size() - 2;
+                // **檢查是否有 "access"，若有則再減 1** => access 不算一種 net 
+                int access_count = count(new_sequence.begin(), new_sequence.end(), "access");
+                newSize -= access_count;
+
+                if(newSize <= current_edge->capacity){
+                    current_edge->net_sequence = new_sequence;
+                    for (auto& edge : RDL.edge_nodes) {
+                        if (edge.id == current_edge->id) {
+                            edge.net_sequence = new_sequence;  // **確保更新的是 RDL.edge_nodes 內的正確 EdgeNode**
+                            break;
+                        }
+                    }
+                }else{
+                    cout<<"Capacity is not enough"<<endl;
+                    return;
+                }
+
+                // **輸出更新後的 Net Sequence**
+                cout << "Updated Net Sequence: ";
+                for (const auto& node : current_edge->net_sequence) {
+                    cout << node << " => ";
+                }
+                cout << "END" << endl << endl;
+
+                
+            }
+
+            cout << "-------------------\n\n";
+        }
+        
+    }
 }
 
 void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routingCoordinate, const DesignRule& designRule, const string& output_path, double Hor_SPACING_X, int layer, vector<RoutingGraph>& allRDL){
@@ -63,6 +437,7 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     vector<Bump> die1LeftmostBumps, die2LeftmostBumps ; // = FindLeftmostInEachRow(bumps);
     vector<Bump> die1DummyBumps, die2DummyBumps ; // = ProcessLeftAndRight(bumps, leftmostBumps, routingCoordinate, Hor_SPACING_X);
     vector<double> die1Coordinate, die2Coordinate ; 
+    unordered_map<string, unordered_set<string>> net_group_map;
 
     ofstream outputViaFile, outputTriangulationFile, outputNetlistFile ; 
     //未來需要調整的部分!!!
@@ -78,24 +453,31 @@ void ConstructRoutingGraph(const vector<Bump>& bumps, const vector<double> routi
     die1DummyBumps = ProcessLeftAndRight(die1Bumps, die1LeftmostBumps, die1Coordinate, Hor_SPACING_X) ;
     die2DummyBumps = ProcessLeftAndRight(die2Bumps, die2LeftmostBumps, die2Coordinate, Hor_SPACING_X) ;
 
-    for(auto bump : die1Bumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
-    for(auto bump : die1DummyBumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+    // for(auto bump : die1Bumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+    // for(auto bump : die1DummyBumps) RDL1.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
 
-    for(auto bump : die2Bumps) RDL2.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
-    for(auto bump : die2DummyBumps) RDL2.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+    // for(auto bump : die2Bumps) RDL2.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
+    // for(auto bump : die2DummyBumps) RDL2.via_nodes.emplace_back(bump.name, bump.type, bump.id, bump.x, bump.y) ;
 
-    // 使用 CDT 進行三角化
-    RDL1.edge_nodes = Triangulation(RDL1.via_nodes, designRule);
-    RDL2.edge_nodes = Triangulation(RDL2.via_nodes, designRule);
+    // // 使用 CDT 進行三角化
+    // RDL1.edge_nodes = Triangulation(RDL1.via_nodes, designRule);
+    // RDL2.edge_nodes = Triangulation(RDL2.via_nodes, designRule);
     
-    FindAdjacentViaNodes(RDL1) ; //!!!!!
-    FindAdjacentViaNodes(RDL2) ; //!!!!!
+    // FindAdjacentViaNodes(RDL1) ; //!!!!!
+    // FindAdjacentViaNodes(RDL2) ; //!!!!!
 
-    AddAccessViaEdges(RDL1) ;
-    AddAccessViaEdges(RDL2) ;
+    // AddAccessViaEdges(RDL1) ;
+    // AddAccessViaEdges(RDL2) ;
 
-    AddCrossTileEdges(RDL1, designRule) ;
-    AddCrossTileEdges2(RDL1, designRule) ;
+    // AddCrossTileEdges(RDL1, designRule) ;
+    // AddCrossTileEdges(RDL2, designRule) ;
+
+
+    // //要改寫繞線順序!!!
+    // auto [rightmost_per_row, remaining_per_row] = findUpperLowerOtherPerRow(RDL1.via_nodes, net_group_map);
+
+        
+    // routeUpperLower(rightmost_per_row, RDL1);  //RDL1 RDL2 分隔導致無法熱繞線
 
     outputViaFile.open(output_path + "via_layer_" + to_string(layer)) ;
     for(auto& bump : die1Bumps) outputViaFile << Bump2Str(bump) << "\n" ;
@@ -239,11 +621,7 @@ double calculateAngle(const ViaNode &V, const EdgeNode &E1, const EdgeNode &E2) 
 
     return angle;  // 回傳角度 (degree)
 }
-void AddCrossTileEdges2(RoutingGraph &RDL, DesignRule designRule) {
-    for (auto &edge_A : RDL.edge_nodes){
-        
-    }
-}
+
 void AddCrossTileEdges(RoutingGraph &RDL, DesignRule designRule) {
     int cross_tile_id = static_cast<int>(RDL.cross_tile_edges.size());  // 記錄初始 ID
     unordered_set<string> added_tiles;  // 避免重複加入 Tile
@@ -265,11 +643,11 @@ void AddCrossTileEdges(RoutingGraph &RDL, DesignRule designRule) {
                         other_access_via.via.type == via.type && 
                         other_access_via.via.id == via.id) 
                     {
-                        if(coutFlag<10){
-                            ++coutFlag ; 
-                            Net A("dummy", {tuple<double,double,double,double>{other_access_via.edge.x, other_access_via.edge.y, via.x, via.y}}) ;
-                            debugNets.push_back(A) ;
-                        }
+                        // if(coutFlag<10){
+                        //     ++coutFlag ; 
+                        //     Net A("dummy", {tuple<double,double,double,double>{other_access_via.edge.x, other_access_via.edge.y, via.x, via.y}}) ;
+                        //     debugNets.push_back(A) ;
+                        // }
                         potential_edges.push_back(&other_access_via.edge);
                     }
                 }
@@ -408,7 +786,6 @@ vector<Bump> FindLeftmostInEachRow(const vector<Bump>& bumps) {
 
     return result;
 }
-bool f = false ; 
 void FindAdjacentViaNodes(RoutingGraph &RDL){
     int n = RDL.edge_nodes.size() ; 
 
@@ -614,9 +991,10 @@ vector<EdgeNode> Triangulation(const vector<ViaNode>& via_nodes, const DesignRul
         EdgeNode newEdgeNode(edgeId++, x, y,
             vector<ViaNode>{point_to_via[segment.source()], point_to_via[segment.target()]}, // Edge Node 紀錄連接的兩個 ViaNode
             capacity);
-
-        string src_type = point_to_via[segment.source()].type + "_" + to_string(point_to_via[segment.source()].id);
-        string tgt_type = point_to_via[segment.target()].type + "_" + to_string(point_to_via[segment.target()].id);
+        
+            
+        string src_type = DieType2Str(point_to_via[segment.source()].type) + "_" + to_string(point_to_via[segment.source()].id);
+        string tgt_type = DieType2Str(point_to_via[segment.target()].type) + "_" + to_string(point_to_via[segment.target()].id);
 
         // 判斷 net_sequence 的方向
         if (fabs(segment.source().y() - segment.target().y()) > EPSILON_Y) { // Edge Node 連接的兩個 ViaNode 的 y 值不同

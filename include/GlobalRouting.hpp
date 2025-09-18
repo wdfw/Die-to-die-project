@@ -39,3 +39,8 @@ void AddAccessViaEdges(RoutingGraph &RDL) ;
 vector<EdgeNode> CreateEdgeNodes(const vector<EdgeNode>& trigulationNodes) ; 
 void AddCrossTileEdges(RoutingGraph &RDL, DesignRule designRule) ;
 void AddCrossTileEdges2(RoutingGraph &RDL, DesignRule designRule) ;
+
+pair<vector<vector<ViaNode>>, vector<vector<ViaNode>>> findUpperLowerOtherPerRow(const vector<ViaNode>& vias, unordered_map<string, unordered_set<string>>& net_group_map) ;
+void routeUpperLower(vector<vector<ViaNode>>& rightmost_per_row, RoutingGraph& RDL) ;
+EdgeNode* findNearestEdgeNode(const ViaNode& via, vector<EdgeNode>& edge_nodes, const string& direction) ;
+CrossTileEdge* findLargestAngleCrossTileEdge(EdgeNode* current_edge, vector<CrossTileEdge>& cross_tile_edges, RoutingGraph& RDL) ;

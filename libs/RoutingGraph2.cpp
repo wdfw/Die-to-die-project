@@ -3,10 +3,14 @@
 //------------------------------------------ ViaNode2 Method Begin ------------------------------------------ 
 
 ostream& operator<<(ostream& os, const ViaNode2& node) {
-    // os << *(static_cast<const Bump*>(node)) << ":\n" ; 
-    for(auto& tileNode : node.tileNodes){
-        // os << static_cast<const Bump&>(*tileNode) << ", " ; 
-    }
+    os << DieType2Str(node.type) << " " << node.id  ;
+    // os << DieType2Str(node.type) << " " << node.id << ":\n" ;
+    // os << "Tiles: " ;
+    // for(auto& tileNode : node.tileNodes) os << DieType2Str(tileNode->type) << " " << tileNode->id << ", " ;
+
+    // os << "\nVias: " ;
+    // for(auto& viaNode : node.viaNodes) os << DieType2Str(viaNode->type) << " " << viaNode->id << ", " ;
+
     return os ; 
 }
 
@@ -15,12 +19,15 @@ ostream& operator<<(ostream& os, const ViaNode2& node) {
 //------------------------------------------ TileNode2 Method Begin ------------------------------------------ 
 
 ostream& operator<<(ostream& os, const TileNode2& node) {
-    // os << static_cast<const Bump&>(*node) << ":\n" ; 
+    os << DieType2Str(node.type) << " " << node.id  ;
+
+    // os << DieType2Str(node.type) << " " << node.id << ":\n" ;
+
     // os << "Tiles: " ;
-    // for(auto& tileNode : node.tileNodes) os << static_cast<const Bump&>(*tileNode) << " " <<  << ", " ; 
+    // for(auto& tileNode : node.tileNodes) os << DieType2Str(tileNode->type) << " " << tileNode->id << ", " ;
 
     // os << "\nVias: " ;
-    // for(auto& viaNode : node.viaNodes) os << static_cast<const Bump&>(*viaNode) << ", " ; 
+    // for(auto& viaNode : node.viaNodes) os << DieType2Str(viaNode->type) << " " << viaNode->id << ", " ;
         
     return os ; 
 }

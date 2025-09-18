@@ -10,6 +10,11 @@ ostream& operator<<(ostream& os, const Bump& bump){
 string Bump2Str(const Bump& bump){
     return bump.name + " " + DieType2Str(bump.type) + " " + to_string(bump.id) + " " + to_string(bump.x) + " " + to_string(bump.y) ;
 }
+
+bool Bump::operator==(const Bump& bump){
+    return name == bump.name && type == bump.type && id == bump.id ; 
+}
+
 //------------------------------------------ Bump Method End ------------------------------------------ 
 
 //------------------------------------------ Net Method Begin ------------------------------------------ 
