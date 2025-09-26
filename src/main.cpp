@@ -52,6 +52,6 @@ int main(int argc, char *argv[]) {
 //./bin/ShowResult result/ case/design.rule #根據design_rule顯示folder的資料
 //./bin/ShowResult wu_result/ case/design.rule
 
-// ./bin/D2D result/RDL1/via_layer_1 case/design.rule wu_result/ > wu_result/RDL1/via_layer_1 ; ./bin/ShowResult wu_result/ case/design.rule
+// ./bin/D2D case/d2d_case_bump.location case/design.rule wu_result/ ; ./bin/ShowResult wu_result/ case/design.rule
 
 //make ; ./bin/D2D case/d2d_case_bump.location case/design.rule wu_result/ ; ./bin/ShowResult wu_result/ case/design.rule

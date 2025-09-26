@@ -18,12 +18,14 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
     string netListPath ;
     string teardropPath ;
     string triangulationPath ; 
-
+    string debugLabelPath ; 
+    
     vector<Bump> bumps, offsetBumps1, offsetBumps2 ; // 在 bump layer 上的點
     vector<double> coordinate ;  // min_x, min_y, max_x, max_y
     vector<Net> nets ; 
     vector<tuple<Bump, double, double, double, double>> teardrops ;
     vector<tuple<double, double, double, double>> triangulationEdges ;
+    vector<tuple<string, double, double>> debugLabels ; 
 
     vector<Bump> allBumps ;
     DesignRule designRule;
@@ -51,7 +53,7 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
         netListPath = dir + "/netlist_" + layerNumber ; 
         teardropPath = dir + "/teardrop_" + layerNumber ; 
         triangulationPath = dir + "/triangulation_edge" ;
-
+        debugLabelPath = dir + "/debug_label" ;
         
         //畫德勞尼三角形
         if(filesystem::exists(triangulationPath)){
@@ -82,6 +84,12 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
         if(filesystem::exists(netListPath)){
             ParseNet(netListPath, nets) ;
             for(int i=0; i<nets.size(); i++) drawer.DrawNet(nets[i]) ;
+        }
+
+        //畫debug文字
+        if(filesystem::exists(debugLabelPath)){
+            ParseDebugLabel(debugLabelPath, debugLabels) ;
+            for(int i=0; i<debugLabels.size(); i++) drawer.DrawDebugLabel(debugLabels[i]) ;
         }
     }
 }

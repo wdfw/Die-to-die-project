@@ -127,6 +127,17 @@ void Drawer::DrawNet(const Net& net, Qt::GlobalColor netColor){
     }
 }
 
+void Drawer::DrawDebugLabel(const tuple<string, double, double>& debugLabel){
+    QString label = QString::fromStdString(get<0>(debugLabel)) ; 
+    QGraphicsSimpleTextItem* textItem = new QGraphicsSimpleTextItem(label);
+    
+    textItem->setBrush(Qt::white);
+    textItem->setFont(QFont("Arial", 12));  // 字小一點
+    textItem->setPos(get<1>(debugLabel)- 5, get<2>(debugLabel)-5);  
+
+    scene->addItem(textItem);  // 直接加進 scene，不加進 group
+}
+
 void Drawer::DrawTeardrop(const tuple<Bump, double, double, double, double>& teardrop) {
     point bumpPt(get<1>(teardrop), get<2>(teardrop)) ;
     point segPt(get<3>(teardrop), get<4>(teardrop)) ;
@@ -206,7 +217,6 @@ void Drawer::DrawDieBoundary(const vector<double>& coordinate){
     scene->addLine(coordinate[2], coordinate[1], coordinate[2], coordinate[3], redPen);
     scene->addLine(coordinate[0], coordinate[1], coordinate[2], coordinate[1], redPen);
     scene->addLine(coordinate[0], coordinate[3], coordinate[2], coordinate[3], redPen);
-
 }
 
 void Drawer::DrawTriangulation(const tuple<double, double, double, double>& edge){

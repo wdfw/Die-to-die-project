@@ -5,6 +5,8 @@ const double EPSILON_X = 1e-3;
 vector<Bump> debugBumps ; 
 vector<EdgeNode> debugEdges ; 
 vector<Net> debugNets ; 
+vector<tuple<string, double, double>> debugLabels ; 
+
 int coutFlag = 0 ;
 int GlobalRoute(const vector<Bump>& bumps, const vector<double>& routingCoordinate, 
                 const DesignRule& designRule, const string& outputDirectories, vector<RoutingGraph>& allRDL, 

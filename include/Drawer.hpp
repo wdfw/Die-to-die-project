@@ -71,6 +71,7 @@ public:
     void DrawTeardrop(const tuple<Bump, double, double, double, double>& teardrop) ; // 畫一顆Teardrop
     void DrawDieBoundary(const vector<double>& coordinate) ; // 畫Die的邊界, 目前邊界僅為參考用
     void DrawTriangulation(const tuple<double, double, double, double>& edge) ; // 畫三角化的邊
+    void DrawDebugLabel(const tuple<string, double, double>& label) ;
 
     // void DrawOneRDL(vector<Bump> &bumps, vector<double> &coordinate) ; 
     // void DrawAllRDL(vector<Bump> &bumps, vector<double> &coordinate) ; 

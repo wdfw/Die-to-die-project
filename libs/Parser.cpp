@@ -142,3 +142,20 @@ void ParseTriangulation(const string &inputPath, vector<tuple<double, double, do
         triangulationEdges.push_back({x1, y1, x2, y2}) ; 
     }
 }
+
+void ParseDebugLabel(const string &inputPath, vector<tuple<string, double, double>>& labels){ 
+    ifstream file(inputPath);
+    if(!file.is_open()) throw runtime_error("[ParseDebugLabel] Failed to open bump file: " + inputPath);
+
+    string line, label ;
+    double x, y ;
+
+    labels.clear() ; 
+    for(int lineNumber=1; getline(file, line); ++lineNumber){
+        if((line = Strip(line)).empty()) continue ;
+   
+        istringstream iss(line);
+        if (!(iss >> label >> x >> y )) throw runtime_error("[ParseDebugLabel] Error parsing in line #" + to_string(lineNumber)) ;
+        labels.push_back({label, x, y}) ; 
+    }
+}

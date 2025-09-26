@@ -24,7 +24,7 @@ class TileNode2 : public Bump {
 public:
     struct TileToTileEdge : public shared_ptr<TileNode2> {
         shared_ptr<int> capacity = make_shared<int>(0) ;
-        // shared_ptr<pair<shared_ptr<TileNode2>, shared_ptr<TileNode2>>> crossedEdge ;
+        shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2  ; 
         TileToTileEdge(const shared_ptr<TileNode2>& node) : shared_ptr<TileNode2>(node) {} ;
     } ;
     vector<shared_ptr<ViaNode2>> viaNodes ; 
@@ -38,9 +38,5 @@ class RoutingGraph2 {
 public:
     vector<shared_ptr<ViaNode2>> viaNodes;             
     vector<shared_ptr<TileNode2>> tileNodes;            
-    map<shared_ptr<ViaNode2>, set<shared_ptr<TileNode2>>> viaToTileEdges ; 
-    map<shared_ptr<TileNode2>, set<shared_ptr<TileNode2>>> tileToTileEdges ; 
-
-
 };
 
