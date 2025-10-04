@@ -12,3 +12,4 @@ testcase/
 cmake*
 CMakeFiles/
 CMakeCache.txt
+GA/

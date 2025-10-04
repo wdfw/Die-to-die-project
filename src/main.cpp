@@ -5,7 +5,7 @@
 #include "Bump.hpp"
 #include "DesignRule.hpp"
 #include "Parser.hpp"
-#include "GlobalRouting2.hpp"
+#include "GAChannelRoute.hpp"
 
 //Drawer.hppㄧ定要include在最上層
 
@@ -33,10 +33,9 @@ int main(int argc, char *argv[]) {
     ParseBump(bumpFilePath, allBumps, routingCoordinate) ;
     ParseDesignRule(designRulePath, designRule) ;
 
-    Router router(designRule, allBumps, routingCoordinate) ;
+    GARouter router(designRule, allBumps, routingCoordinate) ;
 
-    router.Initial() ; 
-    router.GlobalRoute(outputDirectories) ;
+    router.Solve(outputDirectories) ;
     
     // vector<RoutingGraph> allRDL ; GlobalRoute(allBumps, routingCoordinate, designRule, outputDirectories, allRDL, 0, globalRouteTimes);
     

@@ -35,12 +35,13 @@ find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(CGAL REQUIRED COMPONENTS Qt5)
 
 # 自動抓取 main.cpp 以及 src 資料夾底下所有 .cpp
-file(GLOB_RECURSE MAIN_SOURCES
+file(GLOB_RECURSE MAIN_SOURCES 
     "${CMAKE_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_SOURCE_DIR}/libs/*.cpp" 
 )
+
 #ShowGraph
-#ShowResult
+#ShowResult  
 
 # file(GLOB_RECURSE GEN_SOURCES
 #     "${CMAKE_SOURCE_DIR}/src/BumpGenerator.cpp"

@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <vector>
+#include <limits>
 
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -21,12 +22,14 @@ extern vector<tuple<string, double, double>> debugLabels ;
 using namespace std ; 
 
 class Router {
-private:
+protected:
     const double epsilonX = 1e-3 ;
     const double epsilonY = 1e-6 ;
-    
-    void FindLeftMostInEachRow(const vector<Bump>& bumps, vector<Bump>& leftMostBumps) ;
-    void PaddingBumps(const vector<Bump>& bumps, vector<Bump>& paddingBumps, const vector<double>& coordinate, double minimumHorizontalSpace) ; //生成 Padding Bump使其可以順利三角化
+    void Initialize() ;
+    // void FindLeftMostInEachRow(const vector<Bump>& bumps, vector<Bump>& leftMostBumps) ;
+
+    void FindHorizontalSpace(const vector<Bump>& bumps, double& minimumHorizontalSpace) ; 
+    void PaddingBumps(const vector<Bump>& bumps, vector<Bump>& paddingBumps, const vector<double>& coordinate, double minimumHorizontalSpace) ; 
     
     void CreateViaNodes(RoutingGraph2& graph, const vector<Bump>& bumps) ;
     void Triangulation(RoutingGraph2& graph) ;
@@ -38,8 +41,9 @@ private:
     void SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps) ; 
     void CreateViaBumps(const vector<Bump>& offsetBumps, vector<Bump>& viaBumps) ;
     void ConstructRoutingGraph(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, RoutingGraph2& graph, double minimumHorizontalSpace) ; 
-
     void GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, const RoutingGraph2& graph, int layer,  const string& directoryPath) ;
+    
+    virtual void GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) ; 
 public:
     DesignRule designRule ; 
     vector<Bump> bumps ; 
@@ -48,8 +52,6 @@ public:
     vector<clock_t> routingTimes ;
 
     Router(const DesignRule& designRule, const vector<Bump>& bumps, const vector<double>& coordinate) ;
-
-    void Initial() ;
-    void GlobalRoute(const string& outputDirectories="") ; 
+    void Solve(const string& outputDirectories="") ; 
 } ;
 

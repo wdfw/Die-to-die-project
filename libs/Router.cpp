@@ -1,5 +1,9 @@
-#include "GlobalRouting2.hpp"
+#include "Router.hpp"
 
+vector<Bump> debugBumps ; 
+// vector<EdgeNode> debugEdges ; 
+vector<Net> debugNets ; 
+vector<tuple<string, double, double>> debugLabels ; 
 //------------------------------------------ Router Method Begin ------------------------------------------ 
 
 Router::Router(const DesignRule& designRule, const vector<Bump>& bumps, const vector<double>& coordinate){
@@ -8,13 +12,24 @@ Router::Router(const DesignRule& designRule, const vector<Bump>& bumps, const ve
     this->coordinate = coordinate ; 
 }
 
-void Router::Initial(){
+void Router::Initialize(){
     this->routingTimes.clear() ; 
     this->routingGraphs.clear() ; 
 }
+void Router::FindHorizontalSpace(const vector<Bump>& bumps, double& horizontalSpace){
+    vector<vector<Bump>> groups ;
+    horizontalSpace = numeric_limits<double>::max() ;
 
+    Matrixization(bumps, groups, epsilonY) ; 
+    for(int i=0; i<groups.size(); ++i){
+        for(int j=0; j<groups[i].size()-1; ++j){
+            horizontalSpace = min(horizontalSpace, groups[i][j+1].x - groups[i][j].x) ; 
+        }
+    }
+}
 void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps){
     int leftSignalCount = 0 ;
+    set<int> selectedID = {36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47} ; 
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
     for(int i=0; i<bumps.size(); i++){
@@ -24,7 +39,7 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
         }else if(bumps[i].type==VDD){
             routingBumps.push_back(bumps[i]) ;
         }else if(bumps[i].type==SIGNAL){
-            if(rand()%3){
+            if(selectedID.find(bumps[i].id)!=selectedID.end()){
                 routingBumps.push_back(bumps[i]) ;
             }else{
                 offsetBumps.push_back(bumps[i]) ;
@@ -36,7 +51,7 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
     if(!leftSignalCount) offsetBumps.clear() ; 
 }
 
-void Router::GlobalRoute(const string& outputDirectories){
+void Router::Solve(const string& outputDirectories){
     double horizontalSpace, minY = numeric_limits<double>::max() ; 
     string directoryPath ; 
 
@@ -44,44 +59,28 @@ void Router::GlobalRoute(const string& outputDirectories){
 
     vector<Bump> unroutedBumps = bumps ;
     vector<Bump> marginalBumps, routingBumps, offsetBumps, viaBumps ;
-
-    //找出最左邊的Signal bumps
-    for(const auto& bump : bumps){
-        if(bump.type == SIGNAL){
-            if(bump.y<minY){
-                minY = bump.y ;
-                marginalBumps.clear() ; 
-            }
-            if(fabs(bump.y - minY) < epsilonY){
-               marginalBumps.push_back(bump) ;
-            }
-        }
-    }
-    sort(marginalBumps.begin(), marginalBumps.end(), [](const Bump& a, const Bump& b) {return a.x < b.x;}) ;
-    horizontalSpace = marginalBumps[1].x - marginalBumps[0].x ; 
     
     for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
         RoutingGraph2 routingGraph ; 
-
         directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
 
         if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
         timer.SetClock() ;
 
+        FindHorizontalSpace(unroutedBumps, horizontalSpace) ;
         SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps) ;
         CreateViaBumps(offsetBumps, viaBumps) ;
-
         ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace) ;
 
-        // GAChannelRoute(routingBumps, routingGraph) ; 
+        GlobalRoute(routingBumps, routingGraph) ; 
+        
         GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
 
         unroutedBumps = offsetBumps ; 
         routingTimes.push_back(timer.GetDurationMilliseconds()); 
 
         leftBumpCount = 0 ; // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
-        
     }
 }
 
@@ -144,33 +143,12 @@ void Router::GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bu
     outputDebugLabelFile.close() ;
 }
 
-void Router::FindLeftMostInEachRow(const vector<Bump>& bumps, vector<Bump>& leftMostBumps) {
-    vector<vector<Bump>> groups ;
-    vector<Bump> sortedBumps = bumps; sort(sortedBumps.begin(), sortedBumps.end(), [](const Bump& a, const Bump& b) {return a.y < b.y;});
-
-    leftMostBumps.clear() ; 
-
-    for (const auto& via : sortedBumps) {
-        bool added = false;
-        for (auto& group : groups) {
-            if (!group.empty() && fabs(group[0].y - via.y) < epsilonY) {
-                group.push_back(via);
-                added = true;
-                break;
-            }
-        }
-        if (!added)  groups.push_back({via}) ;
-    }
-
-    // 每組選出 x 最小的 bump（即最左點）
-    for(const auto& group : groups) leftMostBumps.push_back( *min_element(group.begin(), group.end(), [](const Bump& a, const Bump& b) {return a.x < b.x;}) );
-}
 void Router::PaddingBumps(const vector<Bump>& bumps, vector<Bump>& paddingBumps, const vector<double>& coordinate, double minimumHorizontalSpace){
     double min_x = coordinate[0], max_x = coordinate[2], current_x ;
     Bump dummyBump ;
 
     vector<Bump> leftmostBumps ; FindLeftMostInEachRow(bumps, leftmostBumps) ;
-    for(auto bump:leftmostBumps) debugBumps.push_back(bump) ;
+    // for(auto bump:leftmostBumps) debugBumps.push_back(bump) ;
     paddingBumps.clear() ;
     for (const auto& point : leftmostBumps) {
         double current_x = point.x;
@@ -456,8 +434,8 @@ void Router::CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGr
     if(die1EscapeTileNodes.size()!=die2EscapeTileNodes.size()) throw runtime_error("Invaild size on dies escape tile nodes (" + to_string(die1EscapeTileNodes.size()) + "," + to_string(die2EscapeTileNodes.size()) + ")") ; 
 
     // cout << die1EscapeTileNodes.size() << "\n" ;
-    cout << &die1EscapeTileNodes << " " << die1EscapeTileNodes.back()->tileNodes.back().crossedViaNode1 << "||\n" ;
-        shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2 ; 
+    // cout << &die1EscapeTileNodes << " " << die1EscapeTileNodes.back()->tileNodes.back().crossedViaNode1 << "||\n" ;
+    shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2 ; 
 
     for(int i=0; i<die1EscapeTileNodes.size(); i++){
         crossedViaNode1 = die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 ;
@@ -493,6 +471,12 @@ void Router::CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGr
 void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps){
     double dx, dy, ddx, ddy, distance, r1, r2 ;
     int overlapBumpIndex ; 
+
+    for(auto& viaNode : graph.viaNodes){
+        for(auto& tileNode : viaNode->tileNodes){
+            (*tileNode.capacity) = numeric_limits<int>::max();
+        }
+    }
     for(auto& tileNode1 : graph.tileNodes){
         for(auto& tileNode2 : tileNode1->tileNodes){
             
@@ -525,21 +509,18 @@ void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, 
                 dy = tileNode2.crossedViaNode1->y - tileNode2.crossedViaNode2->y ; 
                 r1 = (tileNode2.crossedViaNode1->type==DUMMY) ? 0.0 : designRule.viaPadDiameter/2 ;
                 r2 = (tileNode2.crossedViaNode1->type==DUMMY) ? 0.0 : designRule.viaPadDiameter/2 ;
-                cout << sqrt(dx*dx + dy*dy) << " " << r1 << " " << r2 << " " << designRule.minimumLineWidth << " " << designRule.minimumLineSpacing << "\n";
                 distance = sqrt(dx*dx + dy*dy) - r1 - r2 ; 
             }
 
             
             *tileNode2.capacity = max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing)), 0.0) ; 
            
-            
-            string name = "ground" ;
-            
+            // string name = "ground" ;
             // cout << tileNode2.crossedViaNode1->x << " " << tileNode2.crossedViaNode1->y << " " << tileNode2.crossedViaNode2->x << " " << tileNode2.crossedViaNode2->y << "\n" ; 
-            debugNets.push_back(Net(name, {{tileNode2.crossedViaNode1->x, tileNode2.crossedViaNode1->y, tileNode2.crossedViaNode2->x, tileNode2.crossedViaNode2->y}})) ;
-            dx = (tileNode2.crossedViaNode1->x + tileNode2.crossedViaNode2->x)/2 ;
-            dy = (tileNode2.crossedViaNode1->y + tileNode2.crossedViaNode2->y)/2 ;
-            debugLabels.push_back({to_string(*tileNode2.capacity), dx, dy}) ;
+            // debugNets.push_back(Net(name, {{tileNode2.crossedViaNode1->x, tileNode2.crossedViaNode1->y, tileNode2.crossedViaNode2->x, tileNode2.crossedViaNode2->y}})) ;
+            // dx = (tileNode2.crossedViaNode1->x + tileNode2.crossedViaNode2->x)/2 ;
+            // dy = (tileNode2.crossedViaNode1->y + tileNode2.crossedViaNode2->y)/2 ;
+            // debugLabels.push_back({to_string(*tileNode2.capacity), dx, dy}) ;
         }
     }
 }
@@ -578,9 +559,11 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
     SetCapacity(RDL3, offsetBumps, viaBumps) ; 
 
     graph = RDL3 ;
-    
-   
+}
+
+void Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph){
 
 }
+
 
 //------------------------------------------ Router Method End ------------------------------------------ 
