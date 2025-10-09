@@ -26,9 +26,9 @@ ostream& operator<<(ostream& os, const PhenotypeType& phenotype){
         if(v) os << v->id << " "  ;
         else os << "NULL " ;
     }
-    for(int i=0; i<phenotype.size()-1; ++i){
-         debugNets.push_back(Net("ground", {{phenotype[i]->x ,phenotype[i]->y, phenotype[i+1]->x, phenotype[i+1]->y}})) ;
-    }
+    // for(int i=0; i<phenotype.size()-1; ++i){
+    //      debugNets.push_back(Net("ground", {{phenotype[i]->x ,phenotype[i]->y, phenotype[i+1]->x, phenotype[i+1]->y}})) ;
+    // }
     return os ; 
 }   
 
@@ -49,7 +49,7 @@ ostream& operator<<(ostream& os, const ChromosomeType& chromosome){
 void ChromosomeType::UpdatePhenotype(const vector<ChannelType>& channels){
     int s=-1, u=phenotype.upChannelStartIndex, d=phenotype.bottomChannelStartIndex ;
     const ChannelType& channel = channels[phenotype.channelNum] ;
-
+    phenotype.clear() ;
     for(int i=genotype.startIndex; u<phenotype.upChannelEndIndex && d<phenotype.bottomChannelEndIndex && i<genotype.endIndex; ){
         if(s==-1){
             if(genotype[i]==0){
@@ -309,17 +309,109 @@ void GARouter::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& grap
     //------------------------------------------------------------------------------------------------
     //-------------------------------------GA Start---------------------------------------------------
     //------------------------------------------------------------------------------------------------
-    vector<ClusterChromosomes> population ;
+    vector<ClusterChromosomes> population, parents1, parents2, crossoverOffsprings, mutationOffsprings, surviors ;
     map<int, shared_ptr<ViaNode2>> resultIndexMapping ; 
     
     //Initialize
     Initial(phenotypeInformations, genotypeInformations, channels, population) ;
+    EvaluateAll(population) ; 
+
+
+     for(int i=0; i<config.num_generations ; i++){
+        SelectParents(population, parents1, parents2) ;
+        Crossover(parents1, parents2, crossoverOffsprings) ;
+        Mutation(crossoverOffsprings, mutationOffsprings) ;
+
+        for(auto& cc : mutationOffsprings){
+            for(auto& c : cc) c.UpdatePhenotype(*c.channelsPtr) ;
+        }
+
+        Evaluate(mutationOffsprings) ; 
+
+
+        SelectSurviors(population, mutationOffsprings, surviors) ; population = surviors ;
+
+        EvaluateAll(population) ; 
+
+    }
+    ClusterChromosomes bestClusterChromosomes = *min_element(population.begin(), population.end(), [](ClusterChromosomes& c1, ClusterChromosomes& c2){return c1.fitness<c2.fitness;}) ;
+    cout << "Best result: " << bestClusterChromosomes.fitness << "\n" ;
+    int v = 0 ;
+    for(auto& chromosome : bestClusterChromosomes){
+        
+        double r = 5*(v%4) ;
+        for(int k=0; k<chromosome.phenotype.size()-1; ++k){
+            debugNets.push_back(Net("DUMMY", {{chromosome.phenotype[k]->x+r , chromosome.phenotype[k]->y+r,
+                    chromosome.phenotype[k+1]->x+r , chromosome.phenotype[k+1]->y+r}})) ;
+        }
+        v ++ ; 
+        
+    }
+    
+}
+
+void GARouter::SelectSurviors(vector<ClusterChromosomes>& population,  vector<ClusterChromosomes>& offsprings, vector<ClusterChromosomes>& survivors){
+    survivors = population ;
+    survivors.insert(survivors.end(), offsprings.begin(), offsprings.end()) ;  
+    sort(survivors.begin(), survivors.end(), [](ClusterChromosomes& c1, ClusterChromosomes& c2){return c1.fitness<c2.fitness;}) ; 
+
+    for(;survivors.size()>population.size();) survivors.pop_back() ; 
+} 
+
+
+void GARouter::Crossover(vector<ClusterChromosomes>& population1, vector<ClusterChromosomes>& population2, vector<ClusterChromosomes>& offsprings) {
+    offsprings.clear() ;
+
+    for(int i=0, p1, p2; offsprings.size()<config.population_size; ++i){
+        ClusterChromosomes offspring1 = population1[i%population1.size()], offspring2 = population2[i%population2.size()] ;
+        
+        if(crossoverDistrbution(generator)){
+            for(int j=0; j<offspring1.size(); ++j){
+                p1 = generator() % (1+offspring1[j].genotype.size()), p2 = generator() % (1+offspring2[j].genotype.size()) ;
+                while(p1==p2){ p1 = generator() % (1+offspring1[j].genotype.size()) ; p2 = generator() % (1+offspring2[j].genotype.size()) ;}
+                if(p1>p2) swap(p1, p2) ; 
+
+                for(int k=p1; k<p2; k++) swap(offspring1[j].genotype[k], offspring2[j].genotype[k]) ;
+            }
+        }
+
+        if(offsprings.size()<config.population_size) offsprings.push_back(offspring1) ;
+        if(offsprings.size()<config.population_size) offsprings.push_back(offspring2) ;
+    }
+}
+
+void GARouter::Mutation(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& offsprings){
+    offsprings = population ; 
+
+    for(int i=0; i<offsprings.size(); ++i){
+        for(int j=0; j<offsprings[i].size(); ++j){
+            for(int k=0; k<offsprings[i][j].genotype.size(); ++k){
+                if(mutationDistrbution(generator) && offsprings[i][j].genotype[k]!=2) offsprings[i][j].genotype[k] = 1-offsprings[i][j].genotype[k] ;
+            }
+        }
+    }
+}
+
+void GARouter::SelectParents(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& parents1, vector<ClusterChromosomes>& parents2){
+    
+    parents1.clear() ; parents2.clear() ; 
+    
+    for(int i=0; i<config.population_size; i++){
+        vector<ClusterChromosomes> candidates ;
+        vector<ClusterChromosomes>& parents = (i%2) ? parents2 : parents1 ; 
+        for(int j=0; j<config.tournament_size; j++) candidates.push_back(population[generator()%population.size()]) ; 
+
+        // 絕對型競爭法
+        parents.push_back(*min_element(candidates.begin(), candidates.end(), [](ClusterChromosomes& c1, ClusterChromosomes& c2){return c1.fitness<c2.fitness;}) ) ; 
+    }
 }
 void GARouter::Initial(const vector<tuple<int,int, int, int, int>>& phenotypeInformations, const vector<tuple<int,int,int>>& genotypeInformations, const vector<ChannelType>& channels, vector<ClusterChromosomes>& population){
-    populations = vector<ClusterChromosomes>(config.population_size) ; 
-
-    for(int i=0; i<populations.size(); ++i){
-        ClusterChromosomes& cluster = populations[i] ;
+    population = vector<ClusterChromosomes>(config.population_size) ; 
+    crossoverDistrbution = bernoulli_distribution(config.cross_prob) ;  
+    mutationDistrbution = bernoulli_distribution(config.mut_prob) ;  
+    
+    for(int i=0; i<population.size(); ++i){
+        ClusterChromosomes& cluster = population[i] ;
        
         for(int j=0; j<phenotypeInformations.size(); ++j){
             ChromosomeType chromosome = {{
@@ -337,16 +429,61 @@ void GARouter::Initial(const vector<tuple<int,int, int, int, int>>& phenotypeInf
             chromosome.channelsPtr = make_shared<vector<ChannelType>>(channels) ; 
             chromosome.Random(*chromosome.channelsPtr) ; 
             cluster.push_back(chromosome) ; 
+
+            // double r = 5*(j%4) ; 
+            // cout << r << "\n" ;
+            // for(int k=0; k<chromosome.phenotype.size()-1; ++k){
+            //     debugNets.push_back(Net("DUMMY", {{chromosome.phenotype[k]->x+r , chromosome.phenotype[k]->y+r,
+            //          chromosome.phenotype[k+1]->x+r , chromosome.phenotype[k+1]->y+r}})) ;
+            // }
+            // break;
         }
     }
 }
 
-double GARouter::Fitness(ClusterChromosomes& chromosomes){
-    
+double GARouter::CacluteWireLength(ClusterChromosomes& chromosomes){
+
+    return 0 ; 
 }
 
-void GARouter::Evalute(vector<ClusterChromosomes>& population){
-    for(auto& cluster : population){
-        if(cluster.fitness<0.0) cluster.fitness = Fitness(cluster) ; 
+double GARouter::CacluteCapacityValue(ClusterChromosomes& chromosomes){
+
+    return 0 ; 
+}
+
+double GARouter::CacluteConflictCount(ClusterChromosomes& chromosomes){
+    map<TileToTileEdge, int> originalCapacity ;
+    double incompatibleCount = 0.0 ; 
+    for(int i=0; i<chromosomes.size(); ++i){
+        for(int j=0; j<chromosomes[i].phenotype.size(); ++j){
+            auto& tileNode = chromosomes[i].phenotype[j] ; 
+            if(originalCapacity.find(tileNode)==originalCapacity.end()) originalCapacity[tileNode] = *tileNode.capacity ;
+            *tileNode.capacity -= 1 ;
+        }
     }
+
+    for(auto& [tileNode, capacity] : originalCapacity){
+        if((*tileNode.capacity)<0) incompatibleCount -= *tileNode.capacity ;
+        *(tileNode.capacity) = capacity ; 
+    }
+    return incompatibleCount ; 
+}
+double GARouter::Fitness(ClusterChromosomes& chromosomes){
+    //1. Legth
+    //2. Conflict Count
+    //3. Capacity
+    return config.alpha*CacluteWireLength(chromosomes) + config.beta*CacluteCapacityValue(chromosomes) + config.gamma*CacluteConflictCount(chromosomes) ;
+}
+
+void GARouter::Evaluate(vector<ClusterChromosomes>& population){
+    for(auto& cluster : population){
+        cluster.fitness = Fitness(cluster) ; 
+    }
+}
+
+void GARouter::EvaluateAll(vector<ClusterChromosomes>& population){
+    Evaluate(population) ; 
+    double sum = 0.0 ; 
+    for(auto& c : population) sum += c.fitness ;
+    cout << sum/population.size() << "\n" ;
 }

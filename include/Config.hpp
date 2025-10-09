@@ -11,14 +11,18 @@ public:
 
     int dimension = 10;
     string representation = "binary";
-    int population_size = 1;
+    int population_size = 100 ;
     bool uniform_crossover = false;
     string crossover_method = "2-point";
     float cross_prob = 0.9;
     float mut_prob = 0.1;
-    int num_generations = 500;
+    int num_generations = 500 ; 
     bool debug = false;
 
+    int tournament_size = 2 ; 
+    double alpha = 1.0 ;
+    double beta = 1.0 ;
+    double gamma = 1.0 ;
     void print_configuration() const {
         auto configurations = get_configurations();
         const int column_width = 20;

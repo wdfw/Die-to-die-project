@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 #include <limits>
+#include <random>
 
 
 #include "DesignRule.hpp"
@@ -72,17 +73,30 @@ struct ClusterChromosomes : vector<ChromosomeType>{
 };
 
 class GARouter : public Router {
+
+
+    double CacluteWireLength(ClusterChromosomes& chromosomes) ; 
+    double CacluteConflictCount(ClusterChromosomes& chromosomes) ; 
+    double CacluteCapacityValue(ClusterChromosomes& chromosomes) ; 
     double Fitness(ClusterChromosomes& chromosomes) ; 
 
     void Initial(const vector<tuple<int,int, int, int, int>>& genotypeInformations, const vector<tuple<int,int,int>>& phenotypeInformations, 
-                 const vector<ChannelType>& channels, vector<ClusterChromosomes>& populations) ; 
+                 const vector<ChannelType>& channels, vector<ClusterChromosomes>& population) ; 
     
-    void SelectParents(vector<ClusterChromosomes>& populations, vector<int>& selectedIndex) ; 
-    void SelectSurviors(vector<ClusterChromosomes>& populations, vector<int>& selectedIndex) ; 
-    void Evalute(vector<ClusterChromosomes>& populations) ; 
+    void SelectParents(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& parents1, vector<ClusterChromosomes>& parents2) ; 
+    void Crossover(vector<ClusterChromosomes>& population1, vector<ClusterChromosomes>& population2, vector<ClusterChromosomes>& offsprings) ; 
+    void Mutation(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& offsprings) ; 
+    void SelectSurviors(vector<ClusterChromosomes>& population,  vector<ClusterChromosomes>& offsprings, vector<ClusterChromosomes>& survivors) ;
+    void Evaluate(vector<ClusterChromosomes>& population) ; 
+    void EvaluateAll(vector<ClusterChromosomes>& population) ; 
+    
     void ConstructChannel() ;  
     void ConstructRepresentation() ; 
 public:
+    default_random_engine generator ;
+    bernoulli_distribution mutationDistrbution ;
+    bernoulli_distribution crossoverDistrbution ;
+
     Configuration config ;
     using Router::Router ; 
     void GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) override ;

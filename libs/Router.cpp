@@ -29,7 +29,7 @@ void Router::FindHorizontalSpace(const vector<Bump>& bumps, double& horizontalSp
 }
 void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps){
     int leftSignalCount = 0 ;
-    set<int> selectedID = {36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47} ; 
+    set<int> selectedID = {36,40, 41, 45, 42, 46, 39, 47} ; 
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
     for(int i=0; i<bumps.size(); i++){
@@ -513,7 +513,7 @@ void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, 
             }
 
             
-            *tileNode2.capacity = max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing)), 0.0) ; 
+            *tileNode2.capacity = max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing))/2, 0.0) ; 
            
             // string name = "ground" ;
             // cout << tileNode2.crossedViaNode1->x << " " << tileNode2.crossedViaNode1->y << " " << tileNode2.crossedViaNode2->x << " " << tileNode2.crossedViaNode2->y << "\n" ; 
