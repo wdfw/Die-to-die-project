@@ -5,7 +5,7 @@ void GenerateBumpCaseFiles(int num_signals, const string &case_path, const strin
     const double Triangle_Length = 7.0;
     const int max_signal_rows = 4; // 可以是 4, 6, 8, 10, ... => 奇數的話, bump 的排列會跟原本不同
     const double Ver_SPACING_Y = Triangle_Length * sin(M_PI/3.0);
-    const double Hor_SPACING_X = Triangle_Length;
+    const double Hor_SPACING_X = Triangle_Length; //兩個bump間的水平長度
     const double Die_gap = 3.0 * Hor_SPACING_X;
 
     const double Die1_START_X = 15.0;

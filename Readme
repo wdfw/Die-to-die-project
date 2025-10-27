@@ -1,10 +1,111 @@
-編譯方法
-1. 把CMake_ShowGraph.txt取代CMakeLists.txt的內容
-2. $ cmake . 
-2. $ make 
+安裝套件:
+    ## Install CGAL and QT5
+    * sudo apt update
+    * sudo apt install libcgal-dev 
+    * sudo apt install libcgal-qt5-dev 
 
-#ShowResult使用方法
-$ ./ShowResult input_folder design_rule 
-    使用後會根據資料夾中有的檔案與規則生成GUI
-EX: 
-$ ./bin/ShowResult wu_result/ case/design.rule
+    ## Install boost
+    ### boost 1.80
+    * cd ~
+    * wget https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz
+    * tar -xvzf boost_1_80_0.tar.gz
+    * cd boost_1_80_0
+    * mkdir -p ~/myPackage/boost_1_80_0
+    * ./bootstrap.sh --prefix=$HOME/myPackage/boost_1_80_0
+    * ./b2 install --prefix=$HOME/myPackage/boost_1_80_0
+    * rm ~/boost_1_80_0.tar.gz
+    * rm ~/boost_1_80_0
+    ### set environment variable
+    * vim ~/.bashrc
+    * export BOOST_ROOT=$HOME/myPackage/boost_1_80_0
+    * export LD_LIBRARY_PATH=$HOME/myPackage/boost_1_80_0/lib:$LD_LIBRARY_PATH
+    * export CPATH=$HOME/myPackage/boost_1_80_0/include:$CPATH
+    * export PATH=$HOME/myPackage/boost_1_80_0/bin:$PATH
+    * source ~/.bashrc
+    * ls $BOOST_ROOT/include/boost
+    * ls $BOOST_ROOT/lib
+
+    ## Install gcc
+    ### gcc 11.5
+    * cd ~
+    * wget https://ftp.gnu.org/gnu/gcc/gcc-11.5.0/gcc-11.5.0.tar.gz
+    * tar -xvzf gcc-11.5.0.tar.gz
+    * cd gcc-11.5.0
+    * ./contrib/download_prerequisites
+    * mkdir build
+    * cd build
+    * mkdir ~/myPackage/gcc-11.5.0  => gcc 的安裝路徑
+    * ../configure --prefix=$HOME/myPackage/gcc-1.5.0 --enable-languages=c,c++ --disable-multilib
+    * make -j$(nproc)
+    * make install
+    * rm ~/gcc-11.5.0.tar.gz
+    * rm -r ~/gcc-11.5.0
+    ### set environment variable (gcc)
+    * vim ~/.bashrc
+    * export PATH=$HOME/myPackage/gcc-11.5.0/bin:$PATH
+    * export LD_LIBRARY_PATH=$HOME/myPackage/gcc-11.5.0/lib64:$LD_LIBRARY_PATH
+    * export CC=$HOME/myPackage/gcc-11.5.0/bin/gcc
+    * export CXX=$HOME/myPackage/gcc-11.5.0/bin/g++
+    * source ~/.bashrc
+    * gcc --version
+    * g++ --version
+    ### set environment variable (cmake)
+    * export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
+
+編譯方法
+    * 把CMakeLists.txt中, 有#1標記的部分解掉註解, 其餘#2, #3註解掉 //編譯 D2D (繞線)
+    * cmake . 
+    * make 
+    * 把CMakeLists.txt中, 有#2標記的部分解掉註解, 其餘#1, #3註解掉 //編譯 ShowResult (結果顯示)
+    * cmake .
+    * make  
+    * 把CMakeLists.txt中, 有#3標記的部分解掉註解, 其餘#1, #2註解掉 //編譯 GenerateCase (測資生成)
+    * cmake . 
+    * make
+    
+使用流程:
+    1. 建立result資料夾
+    2. 接著根據下列使用方法的EX執行
+
+    #GenerateCase使用方法
+    $ ./GenerateCase source_bump_file result_folder/result_name signal_num
+        使用後會生成根據source_bump_file所建立的bump_file
+        source_bump_file: 原始的bump_file
+        result_folder: 結果的資料夾
+        result_name: 結果名稱
+        signal_num: 信號線的數量, ㄧ定要跟source_bump_file相同
+
+        !!! result_folder/result_name ㄧ定要有'/'連接 !!!
+        EX: 
+        $ ./bin/GenerateCase case/d2d_case_bump.location ./generated_bump_file 44 0
+
+    #D2D使用方法
+    $ ./D2D bump_file  design_rule result_folder
+        使用後會根據設計規則與初始的bump位置, 生成繞線結果
+        為了方便觀察, 目前只會顯示三角規劃與padding bump
+        bump_file: 初始Bumps位置
+        design_rule: 設計規則
+        result_folder: 結果檔案夾
+
+        EX:
+        $ ./bin/D2D ./generated_bump_file case/design.rule result/
+
+    #ShowResult使用方法
+    $ ./ShowResult input_folder design_rule 
+        使用後會根據資料夾中有的檔案與規則生成GUI
+        input_folder: 結果檔案夾
+        design_rule: 設計規則
+
+        EX: 
+        $ ./bin/ShowResult result/ case/design.rule
+
+TODO:
+    修改src/GenerateCase.cpp與include/Generator.hpp使其可以實現下面功能
+    1. 修正輸入必須要有連結符'/'的問題, 讓它可以直接輸出檔案
+        例如可以直接輸入 ./bin/GenerateCase case/d2d_case_bump.location generated_bump_file 44 0
+    2. 可以調整bumps間的距離
+    3. 可以調整signal bumps的數量(Vdd/Vss bumps則隨著signal bumps調整)
+    4. 不用額外參考bump_file(如:d2d_case_bump.locatio)即可直接生成
+    5. 將其與設計規則結合, 使其可以也可以生成設計規則
+
+

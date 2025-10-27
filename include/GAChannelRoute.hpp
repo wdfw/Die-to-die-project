@@ -55,11 +55,13 @@ struct GenotypeType : public vector<int> {
     int endIndex ;
     int codeLength ;
     GenotypeType(int startIndex=-1, int endIndex=-1, int codeLength=0) : startIndex(startIndex), endIndex(endIndex), codeLength(codeLength) {resize(codeLength);}
+    bool operator<(const GenotypeType& genotype) ;
 };
 
 struct ChromosomeType{
     friend ostream& operator<<(ostream& os, const ChromosomeType& chromosome) ;
     void UpdatePhenotype(const vector<ChannelType>& channels) ;
+    void LegalizeGenotype() ;
     void Random(const vector<ChannelType>& channels) ;
     void Random() ; 
     
@@ -73,7 +75,8 @@ struct ClusterChromosomes : vector<ChromosomeType>{
 };
 
 class GARouter : public Router {
-
+    vector<int> order ; 
+    bool saveOrder = false ;
 
     double CacluteWireLength(ClusterChromosomes& chromosomes) ; 
     double CacluteConflictCount(ClusterChromosomes& chromosomes) ; 
@@ -89,7 +92,7 @@ class GARouter : public Router {
     void SelectSurviors(vector<ClusterChromosomes>& population,  vector<ClusterChromosomes>& offsprings, vector<ClusterChromosomes>& survivors) ;
     void Evaluate(vector<ClusterChromosomes>& population) ; 
     void EvaluateAll(vector<ClusterChromosomes>& population) ; 
-    
+
     void ConstructChannel() ;  
     void ConstructRepresentation() ; 
 public:

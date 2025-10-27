@@ -29,7 +29,7 @@ void Router::FindHorizontalSpace(const vector<Bump>& bumps, double& horizontalSp
 }
 void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps){
     int leftSignalCount = 0 ;
-    set<int> selectedID = {36,40, 41, 45, 42, 46, 39, 47} ; 
+    set<int> selectedID = {44, 40, 41, 45,  46, 39, 43, 37} ; 
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
     for(int i=0; i<bumps.size(); i++){
@@ -73,7 +73,7 @@ void Router::Solve(const string& outputDirectories){
         CreateViaBumps(offsetBumps, viaBumps) ;
         ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace) ;
 
-        GlobalRoute(routingBumps, routingGraph) ; 
+        // GlobalRoute(routingBumps, routingGraph) ; 
         
         GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
 
@@ -126,9 +126,9 @@ void Router::GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bu
     }
     // for(auto& viaNode : debugEdges) outputTriangulationFile << edgeNode.start.first << " " << edgeNode.start.second << " " << edgeNode.end.first << " " << edgeNode.end.second << "\n" ;
     outputTriangulationFile.close() ;
-//equal length
+    //equal length
 
-    outputNetlistFile.open(directoryPath + "netlist_" + to_string(layer));
+    outputNetlistFile.open(directoryPath + "debug_net");
     for(auto& net : debugNets){
         for(auto& seg : net){
             outputNetlistFile << net.name << " " << get<0>(seg) << " " << get<1>(seg) << " " << get<2>(seg) << " " << get<3>(seg) << "\n" ;
@@ -513,13 +513,13 @@ void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, 
             }
 
             
-            *tileNode2.capacity = max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing))/2, 0.0) ; 
+            *tileNode2.capacity =  min(max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing))/2, 0.0), 2.0) ; 
            
             // string name = "ground" ;
             // cout << tileNode2.crossedViaNode1->x << " " << tileNode2.crossedViaNode1->y << " " << tileNode2.crossedViaNode2->x << " " << tileNode2.crossedViaNode2->y << "\n" ; 
             // debugNets.push_back(Net(name, {{tileNode2.crossedViaNode1->x, tileNode2.crossedViaNode1->y, tileNode2.crossedViaNode2->x, tileNode2.crossedViaNode2->y}})) ;
-            // dx = (tileNode2.crossedViaNode1->x + tileNode2.crossedViaNode2->x)/2 ;
-            // dy = (tileNode2.crossedViaNode1->y + tileNode2.crossedViaNode2->y)/2 ;
+            dx = (tileNode2.crossedViaNode1->x + tileNode2.crossedViaNode2->x)/2 ;
+            dy = (tileNode2.crossedViaNode1->y + tileNode2.crossedViaNode2->y)/2 ;
             // debugLabels.push_back({to_string(*tileNode2.capacity), dx, dy}) ;
         }
     }

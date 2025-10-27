@@ -36,7 +36,9 @@ find_package(CGAL REQUIRED COMPONENTS Qt5)
 
 # 自動抓取 main.cpp 以及 src 資料夾底下所有 .cpp
 file(GLOB_RECURSE MAIN_SOURCES 
-    "${CMAKE_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_SOURCE_DIR}/src/main.cpp" #1
+    # "${CMAKE_SOURCE_DIR}/src/ShowGraph.cpp" #2
+    # "${CMAKE_SOURCE_DIR}/src/GenerateCase.cpp" #3
     "${CMAKE_SOURCE_DIR}/libs/*.cpp" 
 )
 
@@ -51,11 +53,11 @@ file(GLOB_RECURSE MAIN_SOURCES
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # 添加可執行檔案
-add_executable(D2D ${MAIN_SOURCES})
-# add_executable(ShowResult  ${MAIN_SOURCES})
-# add_executable(BumpGenerator ${GEN_SOURCES})
+add_executable(D2D ${MAIN_SOURCES}) #1
+# add_executable(ShowResult  ${MAIN_SOURCES}) #2
+# add_executable(GenerateCase ${MAIN_SOURCES}) #3
 
 # 連結 Qt5 Widgets 和 CGAL
-target_link_libraries(D2D CGAL::CGAL Qt5::Widgets)
-# target_link_libraries(ShowResult CGAL::CGAL Qt5::Widgets)
-# target_link_libraries(BumpGenerator CGAL::CGAL Qt5::Widgets)
+target_link_libraries(D2D CGAL::CGAL Qt5::Widgets) #1
+# target_link_libraries(ShowResult CGAL::CGAL Qt5::Widgets) #2 
+# target_link_libraries(GenerateCase CGAL::CGAL Qt5::Widgets) #3

@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QString>
 #include <QWidget>
 #include <QGraphicsProxyWidget>
 #include <boost/geometry.hpp>
