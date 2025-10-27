@@ -68,12 +68,13 @@
     2. 接著根據下列使用方法的EX執行
 
     #GenerateCase使用方法
-    $ ./GenerateCase source_bump_file result_folder/result_name signal_num
+    $ ./GenerateCase source_bump_file result_folder/result_name signal_num offset
         使用後會生成根據source_bump_file所建立的bump_file
         source_bump_file: 原始的bump_file
         result_folder: 結果的資料夾
         result_name: 結果名稱
         signal_num: 信號線的數量, ㄧ定要跟source_bump_file相同
+        offset: Die1與Die2垂直差的距離
 
         !!! result_folder/result_name ㄧ定要有'/'連接 !!!
         EX: 
@@ -107,5 +108,6 @@ TODO:
     3. 可以調整signal bumps的數量(Vdd/Vss bumps則隨著signal bumps調整)
     4. 不用額外參考bump_file(如:d2d_case_bump.locatio)即可直接生成
     5. 將其與設計規則結合, 使其可以也可以生成設計規則
-
+    6. 自動算signal的數量, 不用輸入signal_num
+    !!! 記得要給case !!!
 
