@@ -1,0 +1,8 @@
+$boundary_left_x $boundary_bottom_y
+$boundary_right_x $boundary_top_y
+
+$die_name $bump_type $bump_id $x_coordinate $y_coordinate
+.
+.
+.
+
