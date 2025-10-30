@@ -16,13 +16,13 @@ public:
     string crossover_method = "2-point";
     float cross_prob = 0.9;
     float mut_prob = 0.1;
-    int num_generations = 3000 ; 
+    int num_generations = 500 ; 
     bool debug = false;
 
     int tournament_size = 2 ; 
     double alpha = 1.0 ;
-    double beta = 1.0 ;
-    double gamma = 1.0 ;
+    double beta = 100000.0 ;
+    double gamma = 1000000.0 ;
     void print_configuration() const {
         auto configurations = get_configurations();
         const int column_width = 20;

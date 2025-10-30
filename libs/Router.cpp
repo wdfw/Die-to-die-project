@@ -27,9 +27,25 @@ void Router::FindHorizontalSpace(const vector<Bump>& bumps, double& horizontalSp
         }
     }
 }
-void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps){
+void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps, double feedback){
+    //Die1 越靠近中線的越先繞, feedback = 預估可繞線的數量
+
     int leftSignalCount = 0 ;
-    set<int> selectedID = {44, 40, 41, 45,  46, 39, 43, 37} ; 
+    set<int> selectedID ; 
+
+    // if(feedback==1.0) selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
+    // else if(feedback==2.0) selectedID = set<int>{27, 28, 29, 30, 31, 32, 33, 34} ;
+    // else if(feedback==3.0) selectedID = set<int>{19, 20, 21, 22, 23, 24, 25, 26} ; 
+     selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
+    // vector<int> allSignalBumpIndexs ;
+    // for(int i=0; i<bumps.size(); ++i){
+    //     if(bumps[i].type==SIGNAL && bumps[i].name=="DIE1") allSignalBumpIndexs.push_back(i) ; 
+    // }
+    
+    // sort(allSignalBumpIndexs.begin(), allSignalBumpIndexs.end(), [&bumps](int i, int j){return bumps[i].x>bumps[j].x;} ) ;
+    // for(int i=0; i<(allSignalBumpIndexs.size()+int(feedback/2)) && i<allSignalBumpIndexs.size(); ++i) selectedID.insert(bumps[allSignalBumpIndexs[i]].id) ;
+    // cout << selectedID.size() << "-----------\n" ;
+
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
     for(int i=0; i<bumps.size(); i++){
@@ -38,6 +54,7 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
             offsetBumps.push_back(bumps[i]) ;
         }else if(bumps[i].type==VDD){
             routingBumps.push_back(bumps[i]) ;
+            offsetBumps.push_back(bumps[i]) ; //!!!!!!!!
         }else if(bumps[i].type==SIGNAL){
             if(selectedID.find(bumps[i].id)!=selectedID.end()){
                 routingBumps.push_back(bumps[i]) ;
@@ -59,32 +76,52 @@ void Router::Solve(const string& outputDirectories){
 
     vector<Bump> unroutedBumps = bumps ;
     vector<Bump> marginalBumps, routingBumps, offsetBumps, viaBumps ;
-    
-    for(int layer = 1, leftBumpCount = bumps.size(); leftBumpCount; ++layer){
+    vector<double> currentCorrdinate = coordinate ; 
+
+
+    for(int layer = 1, leftBumpCount = bumps.size(); unroutedBumps.size() ; ++layer){
         RoutingGraph2 routingGraph ; 
         directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
+        double globalRoutefeedback = 0.0 ;
+        double accumulatedFeedback = 0.0 ; 
+
+        for(int i=0; i<unroutedBumps.size(); ++i){
+            if(unroutedBumps[i].type==SIGNAL && unroutedBumps[i].name=="DIE1"){
+                 accumulatedFeedback -= 2.0 ; 
+            }
+        }
+
+        if(accumulatedFeedback<-20.0) accumulatedFeedback += 20.0 ;
+        else accumulatedFeedback = 0 ;
 
         if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
         timer.SetClock() ;
-
         FindHorizontalSpace(unroutedBumps, horizontalSpace) ;
-        SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps) ;
-        CreateViaBumps(offsetBumps, viaBumps) ;
-        ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace) ;
-
-        // GlobalRoute(routingBumps, routingGraph) ; 
         
-        GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
+        do{
+            SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps, accumulatedFeedback) ;
+            CreateViaBumps(offsetBumps, viaBumps) ;
+            ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace, currentCorrdinate) ;
+            // cout << unroutedBumps.size() << " " << routingBumps.size() << " " << offsetBumps.size() << "\n" ;
 
-        unroutedBumps = offsetBumps ; 
+            debugNets.clear() ;
+            globalRoutefeedback = GlobalRoute(routingBumps, routingGraph) ; 
+            accumulatedFeedback += globalRoutefeedback ; 
+        }while(globalRoutefeedback<0) ; 
+
+        GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
+        unroutedBumps = viaBumps ; 
+
+        currentCorrdinate[0] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
+        currentCorrdinate[2] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         routingTimes.push_back(timer.GetDurationMilliseconds()); 
 
-        leftBumpCount = 0 ; // for(const auto& bump : die1Bumps) if(bump.type==SIGNAL) ++leftBumpCount ;
     }
 }
 
 void Router::CreateViaBumps(const vector<Bump>& offsetBumps, vector<Bump>& viaBumps){
+    viaBumps.clear() ; 
     for(auto& bump : offsetBumps){
         viaBumps.push_back(bump) ; 
         viaBumps.back().x = bump.x -( designRule.minimumViaSpacing + designRule.viaOpeningDiameter) ;
@@ -524,7 +561,8 @@ void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, 
         }
     }
 }
-void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, RoutingGraph2& graph, double minimumHorizontalSpace) {
+void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, RoutingGraph2& graph, 
+                                   double minimumHorizontalSpace, const vector<double>& coordinate) {
     RoutingGraph2 RDL1, RDL2, RDL3 ; //RDL1 for left part, RDL2 for right part
     
     vector<Bump> die1Bumps, die2Bumps, die1PaddingBumps, die2PaddingBumps ; 
@@ -561,8 +599,8 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
     graph = RDL3 ;
 }
 
-void Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph){
-
+double Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph){
+    return 0 ; 
 }
 
 

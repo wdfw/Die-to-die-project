@@ -31,7 +31,6 @@ ostream& operator<<(ostream& os, const ChromosomeType& chromosome) ;
 struct ChannelType{
     vector<TileToTileEdge> upChannel ;
     vector<TileToTileEdge> upCrossedChannel ;
-    
     vector<TileToTileEdge> bottomChannel ;
     vector<TileToTileEdge> bottomCrossedChannel ;
 };
@@ -47,7 +46,6 @@ struct PhenotypeType : public vector<TileToTileEdge> {
     PhenotypeType(int upChannelStartIndex=-1, int upChannelEndIndex=-1, int bottomChannelStartIndex=-1, int bottomChannelEndIndex=-1, int channelNum=-1) : 
                 upChannelStartIndex(upChannelStartIndex), upChannelEndIndex(upChannelEndIndex), bottomChannelStartIndex(bottomChannelStartIndex),
                 bottomChannelEndIndex(bottomChannelEndIndex), channelNum(channelNum) {}
-
 };
 
 struct GenotypeType : public vector<int> {
@@ -56,6 +54,7 @@ struct GenotypeType : public vector<int> {
     int codeLength ;
     GenotypeType(int startIndex=-1, int endIndex=-1, int codeLength=0) : startIndex(startIndex), endIndex(endIndex), codeLength(codeLength) {resize(codeLength);}
     bool operator<(const GenotypeType& genotype) ;
+    bool operator>(const GenotypeType& genotype) ;
 };
 
 struct ChromosomeType{
@@ -80,6 +79,8 @@ class GARouter : public Router {
 
     double CacluteWireLength(ClusterChromosomes& chromosomes) ; 
     double CacluteConflictCount(ClusterChromosomes& chromosomes) ; 
+    double CacluteConflictCount2(ClusterChromosomes& chromosomes) ; 
+
     double CacluteCapacityValue(ClusterChromosomes& chromosomes) ; 
     double Fitness(ClusterChromosomes& chromosomes) ; 
 
@@ -96,13 +97,15 @@ class GARouter : public Router {
     void ConstructChannel() ;  
     void ConstructRepresentation() ; 
 public:
+    double evalResult = -1.0 ; 
     default_random_engine generator ;
     bernoulli_distribution mutationDistrbution ;
     bernoulli_distribution crossoverDistrbution ;
 
     Configuration config ;
     using Router::Router ; 
-    void GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) override ;
+    double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) override ;
+
 } ;
 
 // TileToTileEdge findRightUp(shared_ptr<ViaNode2> viaNode){
