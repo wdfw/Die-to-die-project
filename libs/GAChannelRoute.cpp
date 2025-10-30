@@ -391,8 +391,9 @@ double GARouter::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& gr
         }
         v ++ ; 
     }
+
     double feedback = -CacluteConflictCount2(bestClusterChromosomes) ; 
-    if(feedback==0.0 && CacluteCapacityValue(bestClusterChromosomes)) feedback = -2 ; 
+    if(feedback==0.0 && CacluteCapacityValue(bestClusterChromosomes)) feedback = -1 ; 
     return feedback ; 
 }
 

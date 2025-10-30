@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(D2D)
-
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # 1) 確保 bin 資料夾存在
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 

@@ -11,7 +11,7 @@ string Bump2Str(const Bump& bump){
     return bump.name + " " + DieType2Str(bump.type) + " " + to_string(bump.id) + " " + to_string(bump.x) + " " + to_string(bump.y) ;
 }
 
-bool Bump::operator==(const Bump& bump){
+bool Bump::operator==(const Bump& bump) const {
     return name == bump.name && type == bump.type && id == bump.id ; 
 }
 

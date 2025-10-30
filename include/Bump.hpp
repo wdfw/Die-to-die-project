@@ -34,7 +34,7 @@ public:
     double x, y;
 
     Bump(const string& name="", DieType type=DUMMY, int id=-1, double x=0.0, double y=0.0) : name(name), type(type), id(id), x(x), y(y) {};
-    bool operator==(const Bump& bump) ;  
+    bool operator==(const Bump& bump) const ;  
 } ;
 
 class Net : public vector<tuple<double,double,double,double>> {

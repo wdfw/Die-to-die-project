@@ -38,7 +38,7 @@ protected:
 
     void CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGraph2& graph3, const vector<double>& coordinate1, const vector<double>& coordinate2) ; 
 
-    void SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps, double feedback) ; 
+    void SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps, int selectNum = numeric_limits<int>::max()) ; 
     void CreateViaBumps(const vector<Bump>& offsetBumps, vector<Bump>& viaBumps) ;
     void ConstructRoutingGraph(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, RoutingGraph2& graph, double minimumHorizontalSpace, const vector<double>& coordinate) ; 
     void GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, const RoutingGraph2& graph, int layer,  const string& directoryPath) ;

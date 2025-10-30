@@ -27,7 +27,7 @@ void Router::FindHorizontalSpace(const vector<Bump>& bumps, double& horizontalSp
         }
     }
 }
-void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps, double feedback){
+void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps, int selectNum){
     //Die1 越靠近中線的越先繞, feedback = 預估可繞線的數量
 
     int leftSignalCount = 0 ;
@@ -36,15 +36,16 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
     // if(feedback==1.0) selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
     // else if(feedback==2.0) selectedID = set<int>{27, 28, 29, 30, 31, 32, 33, 34} ;
     // else if(feedback==3.0) selectedID = set<int>{19, 20, 21, 22, 23, 24, 25, 26} ; 
-     selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
-    // vector<int> allSignalBumpIndexs ;
-    // for(int i=0; i<bumps.size(); ++i){
-    //     if(bumps[i].type==SIGNAL && bumps[i].name=="DIE1") allSignalBumpIndexs.push_back(i) ; 
-    // }
+    // selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
+
+    vector<int> allSignalBumpIndexs ;
+    for(int i=0; i<bumps.size(); ++i){
+        if(bumps[i].type==SIGNAL && bumps[i].name=="DIE1") allSignalBumpIndexs.push_back(i) ; 
+    }
     
-    // sort(allSignalBumpIndexs.begin(), allSignalBumpIndexs.end(), [&bumps](int i, int j){return bumps[i].x>bumps[j].x;} ) ;
-    // for(int i=0; i<(allSignalBumpIndexs.size()+int(feedback/2)) && i<allSignalBumpIndexs.size(); ++i) selectedID.insert(bumps[allSignalBumpIndexs[i]].id) ;
-    // cout << selectedID.size() << "-----------\n" ;
+    sort(allSignalBumpIndexs.begin(), allSignalBumpIndexs.end(), [&bumps](int i, int j){return bumps[i].x>bumps[j].x;} ) ;
+    for(int i=0; i<min(selectNum, int(allSignalBumpIndexs.size())); ++i) selectedID.insert(bumps[allSignalBumpIndexs[i]].id) ;
+    cout << selectedID.size() << "-----------\n" ;
 
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
@@ -82,17 +83,19 @@ void Router::Solve(const string& outputDirectories){
     for(int layer = 1, leftBumpCount = bumps.size(); unroutedBumps.size() ; ++layer){
         RoutingGraph2 routingGraph ; 
         directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
-        double globalRoutefeedback = 0.0 ;
-        double accumulatedFeedback = 0.0 ; 
 
-        for(int i=0; i<unroutedBumps.size(); ++i){
+        int selectedNum = 0 ; 
+        int cc = 0 ;
+        double feedback = 0.0 ;
+
+         for(int i=0; i<unroutedBumps.size(); ++i){
             if(unroutedBumps[i].type==SIGNAL && unroutedBumps[i].name=="DIE1"){
-                 accumulatedFeedback -= 2.0 ; 
+                ++selectedNum ; ++cc ; 
             }
         }
+        selectedNum = min(selectedNum, 10) ;
+       
 
-        if(accumulatedFeedback<-20.0) accumulatedFeedback += 20.0 ;
-        else accumulatedFeedback = 0 ;
 
         if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
@@ -100,23 +103,20 @@ void Router::Solve(const string& outputDirectories){
         FindHorizontalSpace(unroutedBumps, horizontalSpace) ;
         
         do{
-            SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps, accumulatedFeedback) ;
+            SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps, selectedNum) ;
             CreateViaBumps(offsetBumps, viaBumps) ;
             ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace, currentCorrdinate) ;
-            // cout << unroutedBumps.size() << " " << routingBumps.size() << " " << offsetBumps.size() << "\n" ;
 
             debugNets.clear() ;
-            globalRoutefeedback = GlobalRoute(routingBumps, routingGraph) ; 
-            accumulatedFeedback += globalRoutefeedback ; 
-        }while(globalRoutefeedback<0) ; 
+            feedback = GlobalRoute(routingBumps, routingGraph) ; 
+            selectedNum += feedback ;
+        }while(feedback!=0) ; 
 
         GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
         unroutedBumps = viaBumps ; 
-
         currentCorrdinate[0] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         currentCorrdinate[2] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         routingTimes.push_back(timer.GetDurationMilliseconds()); 
-
     }
 }
 
@@ -181,49 +181,69 @@ void Router::GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bu
 }
 
 void Router::PaddingBumps(const vector<Bump>& bumps, vector<Bump>& paddingBumps, const vector<double>& coordinate, double minimumHorizontalSpace){
-    double min_x = coordinate[0], max_x = coordinate[2], current_x ;
-    Bump dummyBump ;
+    vector<Bump> bumpStacks = bumps ;
+    vector<Bump> edgeBumps ;
+    bool isOnEdge, isSearched ;
+    double r = minimumHorizontalSpace ; 
 
-    vector<Bump> leftmostBumps ; FindLeftMostInEachRow(bumps, leftmostBumps) ;
-    // for(auto bump:leftmostBumps) debugBumps.push_back(bump) ;
-    paddingBumps.clear() ;
-    for (const auto& point : leftmostBumps) {
-        double current_x = point.x;
+    double cos60 = 1.0/2 ; 
+    double sin60 = sqrt(3)/2 ; 
+    for(int i=0; i<bumpStacks.size(); ++i){
+        const Bump& bump = bumpStacks[i] ;
+        double cx = bump.x, cy = bump.y ; 
+        for(auto [rx, ry] : vector<pair<double,double>>{{1,0},{-1,0},{cos60,sin60},{-cos60,sin60},{cos60,-sin60},{-cos60,-sin60}}){
+            double nx = cx+rx*r, ny = cy+ry*r ; 
 
-        // 向左移動
-        while (current_x - minimumHorizontalSpace >= min_x + minimumHorizontalSpace) {
-            current_x -= minimumHorizontalSpace ;
-            dummyBump = Bump("Dummy", DUMMY, paddingBumps.size(), current_x, point.y);
+            if(ny<coordinate[1] || ny>coordinate[3]) break ;
+
+            if(nx<coordinate[0]){
+                nx = coordinate[0] ; isOnEdge = true ; 
+            }else if(nx>coordinate[2]){
+                nx = coordinate[2] ; isOnEdge = true ; 
+            }else{
+                isOnEdge = false ; 
+            }
+
+            isSearched = false ; 
+
             
-            if(find_if(bumps.begin(), bumps.end(), [&dummyBump, this](const Bump& bump){return fabs(bump.x - dummyBump.x) < this->epsilonX && fabs(bump.y - dummyBump.y) < this->epsilonY;})==bumps.end()){
-                paddingBumps.push_back(dummyBump);
+            for(auto& serchedBump : bumps){
+                if(serchedBump==bump) continue ;
+
+                if(abs(serchedBump.x-nx)<0.5 && abs(serchedBump.y-ny)<0.5){
+                    isSearched = true ; break;
+                }
             }
-        }
 
-        current_x = min_x ; 
-        dummyBump = Bump("Dummy", DUMMY, paddingBumps.size(), current_x, point.y);
-        if(find_if(bumps.begin(), bumps.end(), [&dummyBump,this](const Bump& bump){return fabs(bump.x - dummyBump.x) < this->epsilonX && fabs(bump.y - dummyBump.y) < this->epsilonY;})==bumps.end()){
-            paddingBumps.push_back(dummyBump);
-        }
+            if(!isSearched){
+                for(auto& serchedBump : paddingBumps){
+                    if(serchedBump==bump) continue ;
 
-        // 向右移動
-        current_x = point.x;
-        while (current_x + minimumHorizontalSpace <= max_x - minimumHorizontalSpace) {
-            current_x += minimumHorizontalSpace;
-            dummyBump = Bump("Dummy", DUMMY, paddingBumps.size(), current_x, point.y);
-
-            if(find_if(bumps.begin(), bumps.end(), [&dummyBump, this](const Bump& bump){return fabs(bump.x - dummyBump.x) < this->epsilonX && fabs(bump.y - dummyBump.y) < this->epsilonY;})==bumps.end()){
-                paddingBumps.push_back(dummyBump);
+                    if(abs(serchedBump.x-nx)<0.5 && abs(serchedBump.y-ny)<0.5){
+                        isSearched = true ; break;
+                    }
+                }
             }
-        }
 
-        current_x = max_x ; 
-        dummyBump = Bump("Dummy", DUMMY, paddingBumps.size(), current_x, point.y);
-        if(find_if(bumps.begin(), bumps.end(), [&dummyBump, this](const Bump& bump){return fabs(bump.x - dummyBump.x) < this->epsilonX && fabs(bump.y - dummyBump.y) < this->epsilonY;})==bumps.end()){
-            paddingBumps.push_back(dummyBump);
+            if(!isSearched){
+                paddingBumps.push_back(Bump("Dummy", DUMMY, paddingBumps.size(), nx, ny)) ;
+                if(isOnEdge) edgeBumps.push_back(paddingBumps.back()) ; 
+                else bumpStacks.push_back(paddingBumps.back()) ; 
+            }            
         }
-       
     }
+
+    for(int i=0; i<edgeBumps.size(); ++i){
+        for(int j=0; j<paddingBumps.size(); ++j){
+            if(edgeBumps[i]==paddingBumps[j]) continue ;
+            if(abs(paddingBumps[j].x-edgeBumps[i].x)<0.5*r && abs(paddingBumps[j].y-edgeBumps[i].y)<0.5){
+                swap(paddingBumps[j], paddingBumps.back()) ; 
+                paddingBumps.pop_back() ; 
+                --j ; 
+            }
+        }
+    }
+
 }
 
 
@@ -470,8 +490,6 @@ void Router::CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGr
 
     if(die1EscapeTileNodes.size()!=die2EscapeTileNodes.size()) throw runtime_error("Invaild size on dies escape tile nodes (" + to_string(die1EscapeTileNodes.size()) + "," + to_string(die2EscapeTileNodes.size()) + ")") ; 
 
-    // cout << die1EscapeTileNodes.size() << "\n" ;
-    // cout << &die1EscapeTileNodes << " " << die1EscapeTileNodes.back()->tileNodes.back().crossedViaNode1 << "||\n" ;
     shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2 ; 
 
     for(int i=0; i<die1EscapeTileNodes.size(); i++){
@@ -569,8 +587,8 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
     vector<double> die1Coordinate, die2Coordinate ;  
 
     ofstream outputViaFile, outputTriangulationFile, outputNetlistFile ; 
-    die1Coordinate = coordinate ; die1Coordinate[2] = die1Coordinate[2]/2 - minimumHorizontalSpace ; 
-    die2Coordinate = coordinate ; die2Coordinate[0] = die2Coordinate[2]/2 + minimumHorizontalSpace ; 
+    die1Coordinate = coordinate ; die1Coordinate[2] = (die1Coordinate[2]+die1Coordinate[0])/2 - minimumHorizontalSpace ; 
+    die2Coordinate = coordinate ; die2Coordinate[0] = (die2Coordinate[2]+die2Coordinate[0])/2 + minimumHorizontalSpace ; 
 
     copy_if(routingBumps.begin(), routingBumps.end(), back_inserter(die1Bumps), [](const Bump& bump){return bump.name=="DIE1"; }) ;
     copy_if(offsetBumps.begin(), offsetBumps.end(), back_inserter(die1Bumps), [](const Bump& bump){return bump.name=="DIE1"; }) ;
