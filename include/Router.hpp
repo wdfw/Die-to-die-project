@@ -43,7 +43,9 @@ protected:
     void ConstructRoutingGraph(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, RoutingGraph2& graph, double minimumHorizontalSpace, const vector<double>& coordinate) ; 
     void GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, const RoutingGraph2& graph, int layer,  const string& directoryPath) ;
     
-    virtual double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) ; 
+    virtual double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets) ; 
+    
+    virtual double DetailRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) ; 
 public:
     DesignRule designRule ; 
     vector<Bump> bumps ; 

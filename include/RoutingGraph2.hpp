@@ -14,12 +14,29 @@ struct TileToTileEdge ;
 ostream& operator<<(ostream& os, const ViaNode2& node)  ;
 ostream& operator<<(ostream& os, const TileNode2& node) ;
 
+struct EdgeNode {
+    
+}
 struct TileToTileEdge : public shared_ptr<TileNode2> {
     shared_ptr<int> capacity = make_shared<int>(0) ;
     shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2  ; 
     TileToTileEdge() = default ; 
     TileToTileEdge(const shared_ptr<TileNode2>& node) : shared_ptr<TileNode2>(node) {} ;
 } ;
+
+struct GraphNet : public shared_ptr<TileToTileEdge>{
+    string name;
+    DieType type;
+    int id;
+
+    shared_ptr<ViaNode2> startViaNode ; 
+    shared_ptr<ViaNode2> endViaNode ; 
+
+    GraphNet(const string name="", const DieType& type=DUMMY, int id=-1, shared_ptr<ViaNode2> startViaNode=nullptr, shared_ptr<ViaNode2> endViaNode=nullptr)
+                : name(name), type(type), id(id), startViaNode(startViaNode), endViaNode(endViaNode) {}
+
+};
+
 
 class ViaNode2 : public Bump {
 public:
@@ -33,7 +50,6 @@ class TileNode2 : public Bump {
 public:
     vector<shared_ptr<ViaNode2>> viaNodes ; 
     vector<TileToTileEdge> tileNodes ; 
-
     using Bump::Bump ; 
     TileNode2(const Bump& bump) : Bump(bump) {} ;
 };
@@ -51,4 +67,5 @@ public:
     vector<shared_ptr<ViaNode2>> viaNodes;             
     vector<shared_ptr<TileNode2>> tileNodes;            
 };
+
 

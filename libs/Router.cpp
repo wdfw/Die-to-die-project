@@ -32,20 +32,18 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
 
     int leftSignalCount = 0 ;
     set<int> selectedID ; 
+    vector<int> allSignalBumpIndexs ;
 
-    // if(feedback==1.0) selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
     // else if(feedback==2.0) selectedID = set<int>{27, 28, 29, 30, 31, 32, 33, 34} ;
     // else if(feedback==3.0) selectedID = set<int>{19, 20, 21, 22, 23, 24, 25, 26} ; 
     // selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
 
-    vector<int> allSignalBumpIndexs ;
     for(int i=0; i<bumps.size(); ++i){
         if(bumps[i].type==SIGNAL && bumps[i].name=="DIE1") allSignalBumpIndexs.push_back(i) ; 
     }
     
     sort(allSignalBumpIndexs.begin(), allSignalBumpIndexs.end(), [&bumps](int i, int j){return bumps[i].x>bumps[j].x;} ) ;
     for(int i=0; i<min(selectNum, int(allSignalBumpIndexs.size())); ++i) selectedID.insert(bumps[allSignalBumpIndexs[i]].id) ;
-    cout << selectedID.size() << "-----------\n" ;
 
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
@@ -65,7 +63,7 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
             }
         }
     }
-    
+
     if(!leftSignalCount) offsetBumps.clear() ; 
 }
 
@@ -78,45 +76,47 @@ void Router::Solve(const string& outputDirectories){
     vector<Bump> unroutedBumps = bumps ;
     vector<Bump> marginalBumps, routingBumps, offsetBumps, viaBumps ;
     vector<double> currentCorrdinate = coordinate ; 
-
+    vector<GraphNet> graphNets ;
 
     for(int layer = 1, leftBumpCount = bumps.size(); unroutedBumps.size() ; ++layer){
         RoutingGraph2 routingGraph ; 
         directoryPath = outputDirectories + "RDL" + to_string(layer) + "/";
-
         int selectedNum = 0 ; 
-        int cc = 0 ;
         double feedback = 0.0 ;
 
          for(int i=0; i<unroutedBumps.size(); ++i){
             if(unroutedBumps[i].type==SIGNAL && unroutedBumps[i].name=="DIE1"){
-                ++selectedNum ; ++cc ; 
+                ++selectedNum ; 
             }
         }
-        selectedNum = min(selectedNum, 10) ;
+        selectedNum = min(selectedNum, 8) ;
        
-
-
         if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
         timer.SetClock() ;
         FindHorizontalSpace(unroutedBumps, horizontalSpace) ;
         
+        cout << "Layer: " << layer << "\n" ; 
+
         do{
             SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps, selectedNum) ;
             CreateViaBumps(offsetBumps, viaBumps) ;
             ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace, currentCorrdinate) ;
 
             debugNets.clear() ;
-            feedback = GlobalRoute(routingBumps, routingGraph) ; 
+            feedback = GlobalRoute(routingBumps, routingGraph, graphNets) ; 
             selectedNum += feedback ;
         }while(feedback!=0) ; 
 
+        DetailRoute(routingBumps, routingGraph) ; 
+
         GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
         unroutedBumps = viaBumps ; 
+
         currentCorrdinate[0] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         currentCorrdinate[2] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         routingTimes.push_back(timer.GetDurationMilliseconds()); 
+        break;
     }
 }
 
@@ -124,7 +124,7 @@ void Router::CreateViaBumps(const vector<Bump>& offsetBumps, vector<Bump>& viaBu
     viaBumps.clear() ; 
     for(auto& bump : offsetBumps){
         viaBumps.push_back(bump) ; 
-        viaBumps.back().x = bump.x -( designRule.minimumViaSpacing + designRule.viaOpeningDiameter) ;
+        viaBumps.back().x = bump.x - ( designRule.minimumViaSpacing + designRule.viaOpeningDiameter) ;
         viaBumps.back().y = bump.y ;
     }
 }
@@ -617,9 +617,12 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
     graph = RDL3 ;
 }
 
-double Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph){
+double Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets){
     return 0 ; 
 }
 
+double Router::DetailRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph){
+    return 0 ; 
+}
 
 //------------------------------------------ Router Method End ------------------------------------------ 

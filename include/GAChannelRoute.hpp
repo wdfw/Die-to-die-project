@@ -34,7 +34,7 @@ struct ChannelType{
     vector<TileToTileEdge> bottomChannel ;
     vector<TileToTileEdge> bottomCrossedChannel ;
 };
-    
+
 
 struct PhenotypeType : public vector<TileToTileEdge> {
     int upChannelStartIndex ; 
@@ -64,27 +64,32 @@ struct ChromosomeType{
     void Random(const vector<ChannelType>& channels) ;
     void Random() ; 
     
+    shared_ptr<ViaNode2> startViaNode ;
+    shared_ptr<ViaNode2> endViaNode ;
+
     PhenotypeType phenotype ;
     GenotypeType  genotype ;
     shared_ptr<vector<ChannelType>> channelsPtr ; 
 };
 
 struct ClusterChromosomes : vector<ChromosomeType>{
+    void ToGraphNets(const vector<int>& orders, vector<GraphNet>& nets) ;
     double fitness = -1.0 ;  
 };
 
 class GARouter : public Router {
     vector<int> order ; 
-    bool saveOrder = false ;
+
+    void AddShielding(ClusterChromosomes& chromosomes, vector<int>& orders) ; 
+    void DetermineOrder(ClusterChromosomes& chromosomes, vector<int>& topDownOrders) ; 
 
     double CacluteWireLength(ClusterChromosomes& chromosomes) ; 
     double CacluteConflictCount(ClusterChromosomes& chromosomes) ; 
-    double CacluteConflictCount2(ClusterChromosomes& chromosomes) ; 
-
     double CacluteCapacityValue(ClusterChromosomes& chromosomes) ; 
     double Fitness(ClusterChromosomes& chromosomes) ; 
 
-    void Initial(const vector<tuple<int,int, int, int, int>>& genotypeInformations, const vector<tuple<int,int,int>>& phenotypeInformations, 
+    void Initial(const vector<tuple<int,int, int, int, int>>& genotypeInformations, const vector<tuple<int,int,int>>& phenotypeInformations,
+                 const vector<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>>& connections,  
                  const vector<ChannelType>& channels, vector<ClusterChromosomes>& population) ; 
     
     void SelectParents(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& parents1, vector<ClusterChromosomes>& parents2) ; 
@@ -104,7 +109,7 @@ public:
 
     Configuration config ;
     using Router::Router ; 
-    double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) override ;
+    double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets) override ;
 
 } ;
 
