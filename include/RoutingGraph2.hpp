@@ -14,9 +14,21 @@ struct TileToTileEdge ;
 ostream& operator<<(ostream& os, const ViaNode2& node)  ;
 ostream& operator<<(ostream& os, const TileNode2& node) ;
 
+
+enum EdgeType {
+    Undefined,
+    BaseEdge, 
+    LegEdge
+} ; 
+
 struct EdgeNode {
-    
-}
+    shared_ptr<ViaNode2> viaNode1, viaNode2 ; 
+    EdgeType type ; 
+    vector<pair<double, double>> positions ; 
+    EdgeNode(shared_ptr<ViaNode2> viaNode1, shared_ptr<ViaNode2> viaNode2, EdgeType type, const vector<pair<double, double>> positions) :
+        viaNode1(viaNode1), viaNode2(viaNode2), type(type), positions(positions) {}
+} ; 
+
 struct TileToTileEdge : public shared_ptr<TileNode2> {
     shared_ptr<int> capacity = make_shared<int>(0) ;
     shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2  ; 
@@ -64,8 +76,9 @@ public:
 // };
 class RoutingGraph2 {
 public:
-    vector<shared_ptr<ViaNode2>> viaNodes;             
-    vector<shared_ptr<TileNode2>> tileNodes;            
+    vector<shared_ptr<ViaNode2>> viaNodes ;             
+    vector<shared_ptr<TileNode2>> tileNodes ;       
+    vector<shared_ptr<EdgeNode>> edgeNodes ;
 };
 
 

@@ -36,6 +36,8 @@ protected:
     void ConnectTileTileEdges(RoutingGraph2& graph) ;
     void SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps) ; 
 
+    void CreateEdgeNodes(RoutingGraph2& graph) ;
+
     void CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGraph2& graph3, const vector<double>& coordinate1, const vector<double>& coordinate2) ; 
 
     void SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routingBumps, vector<Bump>& offsetBumps, int selectNum = numeric_limits<int>::max()) ; 

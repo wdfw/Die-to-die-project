@@ -89,7 +89,7 @@ void Router::Solve(const string& outputDirectories){
                 ++selectedNum ; 
             }
         }
-        selectedNum = min(selectedNum, 8) ;
+        selectedNum = min(selectedNum, 8) ; //!!!!!!
        
         if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
@@ -103,7 +103,7 @@ void Router::Solve(const string& outputDirectories){
             CreateViaBumps(offsetBumps, viaBumps) ;
             ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace, currentCorrdinate) ;
 
-            debugNets.clear() ;
+            // debugNets.clear() ;
             feedback = GlobalRoute(routingBumps, routingGraph, graphNets) ; 
             selectedNum += feedback ;
         }while(feedback!=0) ; 
@@ -613,10 +613,90 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
 
     CombineRDLs(RDL1, RDL2, RDL3, die1Coordinate, die2Coordinate) ; 
     SetCapacity(RDL3, offsetBumps, viaBumps) ; 
-
+    CreateEdgeNodes(RDL3) ; 
     graph = RDL3 ;
+
 }
 
+void Router::CreateEdgeNodes(RoutingGraph2& graph){
+
+    shared_ptr<ViaNode2> viaNode1, viaNode2 ; 
+    vector<pair<double, double>> positions ; 
+    EdgeType type ; 
+    double rx, ry ; 
+    double bx, by ; 
+    double dx, dy ; 
+    double theta ; 
+    double distance ;
+    int capacity ;
+    set<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>> usedPairs ; 
+    for(auto& tileNode : graph.tileNodes){
+        for(auto& adjacentTileNode : tileNode->tileNodes){
+            pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>> ptrPair = {adjacentTileNode.crossedViaNode1 , adjacentTileNode.crossedViaNode2} ;
+            int capacity = *adjacentTileNode.capacity ; 
+            if(usedPairs.find(ptrPair)==usedPairs.end()){
+                usedPairs.insert(ptrPair) ;
+                
+
+                if(fabs(ptrPair.first->y - ptrPair.second->y) < 0.5) type = BaseEdge ; 
+                else type = LegEdge ; 
+
+                if(type==BaseEdge && ptrPair.first->x > ptrPair.second->x) swap(ptrPair.first, ptrPair.second) ; 
+                else if(type==LegEdge && ptrPair.first->y > ptrPair.second->y) swap(ptrPair.first, ptrPair.second) ; 
+
+                dx = fabs(ptrPair.second->x - ptrPair.first->x) ; 
+                dy = fabs(ptrPair.second->y - ptrPair.first->y) ; 
+                bx = ptrPair.first->x ;
+                by = ptrPair.first->y ;
+
+                theta = atan2(dy, dx+1e-6) ; 
+
+                if(1){
+                    dx -= designRule.minimumViaPadSpacing*cos(theta) ;
+                    dy -= designRule.minimumViaPadSpacing*sin(theta) ; 
+                    if(type==LegEdge){
+                        if( ptrPair.first->x < ptrPair.second->x){ // \.
+                            bx += designRule.minimumViaPadSpacing*cos(theta) ; 
+                            by += designRule.minimumViaPadSpacing*sin(theta) ; 
+                        }else{ // /
+                            bx -= designRule.minimumViaPadSpacing*cos(theta) ; 
+                            by += designRule.minimumViaPadSpacing*sin(theta) ; 
+                        }
+                    }else{ // -
+                        bx += designRule.minimumViaPadSpacing*cos(theta) ; 
+                    }
+                    
+                } 
+
+                if(1){
+                    dx -= designRule.minimumViaPadSpacing*cos(theta) ;
+                    dy -= designRule.minimumViaPadSpacing*sin(theta) ; 
+                }
+                
+                distance = sqrt(dx*dx+dy*dy) ; 
+                capacity = 5 ; // max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing)), 0.0), !!!!!!!!!!!
+                positions.clear() ; 
+
+                if(type!=BaseEdge && ptrPair.first->x > ptrPair.second->x) dx = -dx ; 
+                rx = dx/capacity ; 
+                ry = dy/capacity ; 
+
+                for(int i=0; i<capacity; ++i){
+                    positions.push_back({bx+rx*i+0.5*rx, by+ry*i+0.5*ry}) ; 
+                    debugNets.push_back(Net(to_string(100000+debugNets.size()), {{bx+rx*i+0.5*rx, by+ry*i+0.5*ry, bx+rx*i+0.5*rx+1, by+ry*i+0.5*ry+1}})) ;
+                }
+
+                // if(type == BaseEdge) sort(positions.begin(), positions.end(), [](pair<double, double>& a, pair<double, double>& b){return a.first < b.first ; }) ;
+                // else sort(positions.begin(), positions.end(), [](pair<double, double>& a, pair<double, double>& b){return a.second < b.second ; }) ;
+
+                // cout << *ptrPair.first << " " << *ptrPair.second << " " << dx << "," << dy << " " << capacity << "|" << type << "\n" ;
+                // for(auto& [x,y] : positions) cout << x << "," << y << " " ;
+                // cout << "\n\n" ;
+                graph.edgeNodes.push_back(make_shared<EdgeNode>(ptrPair.first, ptrPair.second, type, positions)) ;
+            }
+        }
+    }
+}
 double Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets){
     return 0 ; 
 }
