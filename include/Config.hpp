@@ -11,12 +11,12 @@ public:
 
     int dimension = 10;
     string representation = "binary";
-    int population_size = 100 ;
+    int population_size = 200 ;
     bool uniform_crossover = false;
     string crossover_method = "2-point";
     float cross_prob = 0.9;
-    float mut_prob = 0.1;
-    int num_generations = 1500 ; 
+    float mut_prob = 0.05;
+    int num_generations = 1000 ; 
     bool debug = false;
 
     int tournament_size = 2 ; 

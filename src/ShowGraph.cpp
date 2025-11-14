@@ -62,20 +62,7 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
             for(int i=0; i<triangulationEdges.size(); i++) drawer.DrawTriangulation(triangulationEdges[i]) ;
         }
 
-        //畫淚滴
-        if(filesystem::exists(teardropPath)){
-            ParseTeardrop(teardropPath, teardrops) ;
-            for(int i=0; i<teardrops.size(); i++) drawer.DrawTeardrop(teardrops[i]) ;
-        }
-
-        //畫bumps
-        if(filesystem::exists(viaPath)){
-            ParseBump(viaPath, bumps, coordinate) ;
-            for(int i=0; i<bumps.size(); i++) drawer.DrawBump(bumps[i]) ; 
-            // drawer.DrawDieBoundary(coordinate) ; //檔案中die boundary僅參考用, 所以不畫了
-        }
-
-        //畫offest vias
+  //畫offest vias
         if(filesystem::exists(offsetViaPath)){
             ParseOffsetBump(offsetViaPath, offsetBumps1, offsetBumps2) ;
             for(int i=0; i<offsetBumps1.size(); i++) drawer.DrawOffsetBump(offsetBumps1[i], offsetBumps2[i]) ; 
@@ -104,6 +91,21 @@ void Reload(const vector<string>& RDLDirectories, const string& designRulePath, 
                 drawer.DrawNet(debugNets[i], color) ;
             }
         }
+
+        //畫淚滴
+        if(filesystem::exists(teardropPath)){
+            ParseTeardrop(teardropPath, teardrops) ;
+            for(int i=0; i<teardrops.size(); i++) drawer.DrawTeardrop(teardrops[i]) ;
+        }
+
+        //畫bumps
+        if(filesystem::exists(viaPath)){
+            ParseBump(viaPath, bumps, coordinate) ;
+            for(int i=0; i<bumps.size(); i++) drawer.DrawBump(bumps[i]) ; 
+            // drawer.DrawDieBoundary(coordinate) ; //檔案中die boundary僅參考用, 所以不畫了
+        }
+
+      
 
          //畫debug文字
         if(filesystem::exists(debugLabelPath)){

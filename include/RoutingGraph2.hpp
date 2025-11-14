@@ -31,12 +31,13 @@ struct EdgeNode {
 
 struct TileToTileEdge : public shared_ptr<TileNode2> {
     shared_ptr<int> capacity = make_shared<int>(0) ;
+    shared_ptr<int> currentCapacity = make_shared<int>(0) ;
     shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2  ; 
     TileToTileEdge() = default ; 
     TileToTileEdge(const shared_ptr<TileNode2>& node) : shared_ptr<TileNode2>(node) {} ;
 } ;
 
-struct GraphNet : public shared_ptr<TileToTileEdge>{
+struct GlobalNet : public vector<TileToTileEdge>{
     string name;
     DieType type;
     int id;
@@ -44,11 +45,23 @@ struct GraphNet : public shared_ptr<TileToTileEdge>{
     shared_ptr<ViaNode2> startViaNode ; 
     shared_ptr<ViaNode2> endViaNode ; 
 
-    GraphNet(const string name="", const DieType& type=DUMMY, int id=-1, shared_ptr<ViaNode2> startViaNode=nullptr, shared_ptr<ViaNode2> endViaNode=nullptr)
+    GlobalNet(const string name="", const DieType& type=DUMMY, int id=-1, shared_ptr<ViaNode2> startViaNode=nullptr, shared_ptr<ViaNode2> endViaNode=nullptr)
                 : name(name), type(type), id(id), startViaNode(startViaNode), endViaNode(endViaNode) {}
 
 };
 
+struct DetailedNet : public vector<pair<shared_ptr<EdgeNode>, int>>{
+    string name;
+    DieType type;
+    int id;
+
+    shared_ptr<ViaNode2> startViaNode ; 
+    shared_ptr<ViaNode2> endViaNode ; 
+
+    DetailedNet(const string name="", const DieType& type=DUMMY, int id=-1, shared_ptr<ViaNode2> startViaNode=nullptr, shared_ptr<ViaNode2> endViaNode=nullptr)
+                : name(name), type(type), id(id), startViaNode(startViaNode), endViaNode(endViaNode) {}
+
+};
 
 class ViaNode2 : public Bump {
 public:

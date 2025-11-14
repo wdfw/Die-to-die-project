@@ -11,7 +11,8 @@ enum DieType {
     DUMMY, 
     SIGNAL, 
     VDD,
-    VSS
+    VSS,
+    OFFSET
 } ;
 
 class Bump ; 
@@ -43,4 +44,11 @@ public:
     Net(const string& name="", const vector<tuple<double,double,double,double>>& sequence=vector<tuple<double,double,double,double>>()) : name(name), vector<tuple<double,double,double,double>>(sequence) {} ;
 } ;
 
+class Teardrop : public Bump {
+public:
+    double sx, sy, ex, ey ; 
+    Teardrop(const string& name="", DieType type=DUMMY, int id=-1, double sx=0.0, double sy=0.0, double ex=0.0, double ey=0.0) : 
+       Bump(name, type, id), sx(sx), sy(sy), ex(ex), ey(ey) {}
+
+} ;
 // Bump("Dummy", DUMMY, dummies.size(), current_x, point.y);

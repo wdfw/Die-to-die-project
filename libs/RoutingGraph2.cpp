@@ -3,7 +3,7 @@
 //------------------------------------------ ViaNode2 Method Begin ------------------------------------------ 
 
 ostream& operator<<(ostream& os, const ViaNode2& node) {
-    os << DieType2Str(node.type) << " " << node.id << " " << node.x << " " << node.y  ;
+    os << DieType2Str(node.type) << " " << node.id  ;
     // os << DieType2Str(node.type) << " " << node.id << ":\n" ;
     // os << "Tiles: " ;
     // for(auto& tileNode : node.tileNodes) os << DieType2Str(tileNode->type) << " " << tileNode->id << ", " ;
@@ -33,3 +33,4 @@ ostream& operator<<(ostream& os, const TileNode2& node) {
 }
 
 //------------------------------------------ TileNode2 Method End ------------------------------------------ 
+

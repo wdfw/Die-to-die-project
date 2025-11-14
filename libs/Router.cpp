@@ -3,7 +3,10 @@
 vector<Bump> debugBumps ; 
 // vector<EdgeNode> debugEdges ; 
 vector<Net> debugNets ; 
+vector<Teardrop> debugTeardrops ; 
 vector<tuple<string, double, double>> debugLabels ; 
+vector<Timer> globalTimers(100) ; 
+vector<double> globalExecTimes(100, 0.0) ; 
 //------------------------------------------ Router Method Begin ------------------------------------------ 
 
 Router::Router(const DesignRule& designRule, const vector<Bump>& bumps, const vector<double>& coordinate){
@@ -36,7 +39,7 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
 
     // else if(feedback==2.0) selectedID = set<int>{27, 28, 29, 30, 31, 32, 33, 34} ;
     // else if(feedback==3.0) selectedID = set<int>{19, 20, 21, 22, 23, 24, 25, 26} ; 
-    // selectedID = set<int>{40, 41, 39, 35, 37, 38, 42, 36} ;
+    // selectedID = set<int>{40, 36, 41, 37,42,34,35} ;
 
     for(int i=0; i<bumps.size(); ++i){
         if(bumps[i].type==SIGNAL && bumps[i].name=="DIE1") allSignalBumpIndexs.push_back(i) ; 
@@ -44,7 +47,6 @@ void Router::SelectRoutingBumps(const vector<Bump>& bumps, vector<Bump>& routing
     
     sort(allSignalBumpIndexs.begin(), allSignalBumpIndexs.end(), [&bumps](int i, int j){return bumps[i].x>bumps[j].x;} ) ;
     for(int i=0; i<min(selectNum, int(allSignalBumpIndexs.size())); ++i) selectedID.insert(bumps[allSignalBumpIndexs[i]].id) ;
-
     routingBumps.clear() ; 
     offsetBumps.clear() ; 
     for(int i=0; i<bumps.size(); i++){
@@ -76,7 +78,8 @@ void Router::Solve(const string& outputDirectories){
     vector<Bump> unroutedBumps = bumps ;
     vector<Bump> marginalBumps, routingBumps, offsetBumps, viaBumps ;
     vector<double> currentCorrdinate = coordinate ; 
-    vector<GraphNet> graphNets ;
+    vector<GlobalNet> globalNets ;
+    vector<DetailedNet> detailedNets ;
 
     for(int layer = 1, leftBumpCount = bumps.size(); unroutedBumps.size() ; ++layer){
         RoutingGraph2 routingGraph ; 
@@ -89,26 +92,30 @@ void Router::Solve(const string& outputDirectories){
                 ++selectedNum ; 
             }
         }
-        selectedNum = min(selectedNum, 8) ; //!!!!!!
+        selectedNum = min(selectedNum, 10) ; //!!!!!!
        
         if (!filesystem::exists(directoryPath)) filesystem::create_directories(directoryPath);
         
         timer.SetClock() ;
         FindHorizontalSpace(unroutedBumps, horizontalSpace) ;
         
-        cout << "Layer: " << layer << "\n" ; 
+        cout << "----------------------------------Layer: " << layer << "-----------------------------------\n" ; 
 
         do{
+            debugNets.clear() ; debugLabels.clear() ; debugTeardrops.clear() ; 
             SelectRoutingBumps(unroutedBumps, routingBumps, offsetBumps, selectedNum) ;
             CreateViaBumps(offsetBumps, viaBumps) ;
             ConstructRoutingGraph(routingBumps, offsetBumps, viaBumps, routingGraph, horizontalSpace, currentCorrdinate) ;
-
-            // debugNets.clear() ;
-            feedback = GlobalRoute(routingBumps, routingGraph, graphNets) ; 
+            
+             
+            // for(auto& tileNode : routingGraph.tileNodes) debugLabels.push_back(tuple<string, double, double>{to_string(tileNode->id), tileNode->x, tileNode->y}) ; 
+            
+             
+            feedback = GlobalRoute(routingBumps, routingGraph, globalNets) ; 
             selectedNum += feedback ;
         }while(feedback!=0) ; 
 
-        DetailRoute(routingBumps, routingGraph) ; 
+        DetailRoute(routingBumps, routingGraph, globalNets, detailedNets) ; 
 
         GenerateGraphFile(routingBumps, offsetBumps, viaBumps, routingGraph, layer, directoryPath) ;
         unroutedBumps = viaBumps ; 
@@ -116,7 +123,6 @@ void Router::Solve(const string& outputDirectories){
         currentCorrdinate[0] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         currentCorrdinate[2] -=  designRule.minimumViaSpacing + designRule.viaOpeningDiameter ; 
         routingTimes.push_back(timer.GetDurationMilliseconds()); 
-        break;
     }
 }
 
@@ -176,6 +182,14 @@ void Router::GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bu
     outputDebugLabelFile.open(directoryPath + "debug_label");
     for(auto& debugLabel : debugLabels){
         outputDebugLabelFile <<  get<0>(debugLabel) << " " << get<1>(debugLabel) << " " << get<2>(debugLabel) << "\n" ;
+    }
+    outputDebugLabelFile.close() ;
+
+
+    
+    outputDebugLabelFile.open(directoryPath + "teardrop_" + to_string(layer)) ;
+    for(auto& debugTeardrop : debugTeardrops){
+        outputDebugLabelFile << debugTeardrop.name << " " << DieType2Str(debugTeardrop.type) << " " << debugTeardrop.id << " " << debugTeardrop.sx << " " << debugTeardrop.sy << " " << debugTeardrop.ex << " " << debugTeardrop.ey << "\n" ;
     }
     outputDebugLabelFile.close() ;
 }
@@ -419,6 +433,13 @@ void Router::ConnectTileTileEdges(RoutingGraph2& graph){
                 for(auto& [viaNode, count] : uniqueViaNodes){
                     if(count==2) crossedViaNodes.push_back(viaNode) ;
                 }
+                
+
+                if( crossedViaNodes[0]->name == crossedViaNodes[1]->name &&
+                    crossedViaNodes[0]->id == crossedViaNodes[1]->id &&
+                    crossedViaNodes[0]->type == crossedViaNodes[1]->type){
+                        continue; 
+                    }
                 graph.tileNodes[i]->tileNodes.push_back(graph.tileNodes[j]) ;
                 graph.tileNodes[j]->tileNodes.push_back(graph.tileNodes[i]) ;
 
@@ -479,8 +500,8 @@ void Router::CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGr
                 dieEscapeTileNodes.push_back(graph.tileNodes[i]) ;
                 dieEscapeTileNodes.back()->tileNodes.push_back(make_shared<TileNode2>("DUMMY", DUMMY, 0, 0, 0)) ;
 
-                dieEscapeTileNodes.back()->tileNodes.back().crossedViaNode1 = crossedViaNodes[0] ;
-                dieEscapeTileNodes.back()->tileNodes.back().crossedViaNode2 = crossedViaNodes[1] ;
+                dieEscapeTileNodes.back()->tileNodes.back().crossedViaNode1 = (crossedViaNodes[0]->y < crossedViaNodes[1]->y) ? crossedViaNodes[0] : crossedViaNodes[1] ;
+                dieEscapeTileNodes.back()->tileNodes.back().crossedViaNode2 = (crossedViaNodes[0]->y < crossedViaNodes[1]->y) ? crossedViaNodes[1] : crossedViaNodes[0] ;
             }
         }
     }
@@ -490,40 +511,50 @@ void Router::CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGr
 
     if(die1EscapeTileNodes.size()!=die2EscapeTileNodes.size()) throw runtime_error("Invaild size on dies escape tile nodes (" + to_string(die1EscapeTileNodes.size()) + "," + to_string(die2EscapeTileNodes.size()) + ")") ; 
 
+    for(int i=0; i<die1EscapeTileNodes.size(); ++i){
+        if(i==0) die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1->viaNodes.push_back(die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode1) ;
+        die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode2->viaNodes.push_back(die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode2) ;
+    }
+
     shared_ptr<ViaNode2> crossedViaNode1, crossedViaNode2 ; 
-
+    vector<shared_ptr<TileNode2>> intermediateTileNodes ;
     for(int i=0; i<die1EscapeTileNodes.size(); i++){
-        crossedViaNode1 = die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 ;
-        crossedViaNode2 = die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 ;
+        shared_ptr<TileNode2> intermediateTileNode = make_shared<TileNode2>("DUMMY", DUMMY, graph1.tileNodes.size()+graph2.tileNodes.size()+intermediateTileNodes.size(), 
+                                                    (die1EscapeTileNodes[i]->x + die2EscapeTileNodes[i]->x)/2, (die1EscapeTileNodes[i]->y + die2EscapeTileNodes[i]->y)/2) ; 
 
-        die1EscapeTileNodes[i]->tileNodes.back() = die2EscapeTileNodes[i] ;
-        die2EscapeTileNodes[i]->tileNodes.back() = die1EscapeTileNodes[i] ;
+        intermediateTileNode->tileNodes.push_back(die1EscapeTileNodes[i]) ;
+        intermediateTileNode->tileNodes.back().crossedViaNode1 = die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 ; 
+        intermediateTileNode->tileNodes.back().crossedViaNode2 = die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 ; 
+        intermediateTileNode->tileNodes.back().capacity = die1EscapeTileNodes[i]->tileNodes.back().capacity ;
 
-        die1EscapeTileNodes[i]->tileNodes.back().capacity = die2EscapeTileNodes[i]->tileNodes.back().capacity ;
+        die1EscapeTileNodes[i]->tileNodes.back() = intermediateTileNode ;
+        die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 = intermediateTileNode->tileNodes.back().crossedViaNode1 ;
+        die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 = intermediateTileNode->tileNodes.back().crossedViaNode2 ;
+        die1EscapeTileNodes[i]->tileNodes.back().capacity = intermediateTileNode->tileNodes.back().capacity ;
 
-        die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 = crossedViaNode1 ; 
-        die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 = crossedViaNode2 ; 
+        // cout << die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 << " " << die1EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 << "\n" ; 
 
-        die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 = crossedViaNode1 ; 
-        die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 = crossedViaNode2 ; 
+        intermediateTileNode->tileNodes.push_back(die2EscapeTileNodes[i]) ;
+        intermediateTileNode->tileNodes.back().crossedViaNode1 = die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 ; 
+        intermediateTileNode->tileNodes.back().crossedViaNode2 = die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 ; 
+        intermediateTileNode->tileNodes.back().capacity = die2EscapeTileNodes[i]->tileNodes.back().capacity ;
 
-        // double  dx = crossedViaNode1->x - crossedViaNode2->x ; 
-        // double dy = crossedViaNode1->y - crossedViaNode2->y ; 
+        die2EscapeTileNodes[i]->tileNodes.back() = intermediateTileNode ;
+        die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode1 = intermediateTileNode->tileNodes.back().crossedViaNode1 ;
+        die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode2 = intermediateTileNode->tileNodes.back().crossedViaNode2 ;
+        die2EscapeTileNodes[i]->tileNodes.back().capacity = intermediateTileNode->tileNodes.back().capacity ;
 
-        // cout <<  sqrt(dx*dx + dy*dy) << " " << designRule.viaPadDiameter << " " << designRule.minimumLineWidth << " " << designRule.minimumLineSpacing << "\n" ;
-        // cout << crossedViaNode1->x << " " << crossedViaNode1->y << " " << crossedViaNode2->x << " " << crossedViaNode2->y << "\n\n" ; 
-        // debugNets.push_back(Net("DUMMY", {{die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode1->x, die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode1->y, 
-        //         die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode2->x, die2EscapeTileNodes[i]->tileNodes.back().crossedViaNode2->y}})) ;
+        intermediateTileNodes.push_back(intermediateTileNode) ; 
     }
 
 
     graph3 = RoutingGraph2(graph1) ; 
     for(auto& viaNode : graph2.viaNodes) graph3.viaNodes.push_back(viaNode) ;
     for(auto& tileNode : graph2.tileNodes) graph3.tileNodes.push_back(tileNode) ;
-
+    for(auto& tileNode : intermediateTileNodes) graph3.tileNodes.push_back(tileNode) ;
 }
 
-void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps){
+void Router::SetCapacity(RoutingGraph2& graph){
     double dx, dy, ddx, ddy, distance, r1, r2 ;
     int overlapBumpIndex ; 
 
@@ -532,50 +563,16 @@ void Router::SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, 
             (*tileNode.capacity) = numeric_limits<int>::max();
         }
     }
+
+    map<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>, shared_ptr<EdgeNode>> edgeNodeMapping ; 
+    for(auto& edgeNode : graph.edgeNodes) edgeNodeMapping[{edgeNode->viaNode1, edgeNode->viaNode2}] = edgeNode ; 
+
     for(auto& tileNode1 : graph.tileNodes){
         for(auto& tileNode2 : tileNode1->tileNodes){
-            
-            bool isOVerlap = false ;
-            for(int i=0; i<viaBumps.size(); i++){
-                const Bump& viaBump = viaBumps[i] ;
-                bool cond1 = viaBump.type!=DUMMY ;
-                bool cond2 = min(tileNode2.crossedViaNode1->x, tileNode2.crossedViaNode2->x) < viaBump.x && viaBump.x < max(tileNode2.crossedViaNode1->x, tileNode2.crossedViaNode2->x) ;
-                bool cond3 = viaBump.y - designRule.viaPadDiameter/2 <= tileNode2.crossedViaNode1->y && tileNode2.crossedViaNode1->y <= viaBump.y + designRule.viaPadDiameter/2 ;
-                bool cond4 = viaBump.y - designRule.viaPadDiameter/2 <= tileNode2.crossedViaNode2->y && tileNode2.crossedViaNode2->y <= viaBump.y + designRule.viaPadDiameter/2 ;
-
-                if(cond1 && cond2 && cond3 && cond4){
-                    isOVerlap = true ; overlapBumpIndex = i ; 
-                    break ; 
-                }
-            }
-
-            if(!tileNode2.crossedViaNode1 || !tileNode2.crossedViaNode2) continue ;
-
-            if(isOVerlap){
-                ddx = offsetBumps[overlapBumpIndex].x - viaBumps[overlapBumpIndex].x ; 
-                ddy = offsetBumps[overlapBumpIndex].y - viaBumps[overlapBumpIndex].y ; 
-                dx = tileNode2.crossedViaNode1->x - tileNode2.crossedViaNode2->x ; 
-                dy = tileNode2.crossedViaNode1->y - tileNode2.crossedViaNode2->y ; 
-                r1 = (tileNode2.crossedViaNode1->type==DUMMY) ? 0.0 : designRule.viaPadDiameter/2 ;
-                r2 = (tileNode2.crossedViaNode1->type==DUMMY) ? 0.0 : designRule.viaPadDiameter/2 ;
-                distance = sqrt(dx*dx + dy*dy) - sqrt(ddx*ddx + ddy*ddy) - r1 - r2 ; 
-            }else{
-                dx =  tileNode2.crossedViaNode1->x - tileNode2.crossedViaNode2->x ; 
-                dy = tileNode2.crossedViaNode1->y - tileNode2.crossedViaNode2->y ; 
-                r1 = (tileNode2.crossedViaNode1->type==DUMMY) ? 0.0 : designRule.viaPadDiameter/2 ;
-                r2 = (tileNode2.crossedViaNode1->type==DUMMY) ? 0.0 : designRule.viaPadDiameter/2 ;
-                distance = sqrt(dx*dx + dy*dy) - r1 - r2 ; 
-            }
-
-            
-            *tileNode2.capacity =  min(max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing))/2, 0.0), 2.0) ; 
-           
-            // string name = "ground" ;
-            // cout << tileNode2.crossedViaNode1->x << " " << tileNode2.crossedViaNode1->y << " " << tileNode2.crossedViaNode2->x << " " << tileNode2.crossedViaNode2->y << "\n" ; 
-            // debugNets.push_back(Net(name, {{tileNode2.crossedViaNode1->x, tileNode2.crossedViaNode1->y, tileNode2.crossedViaNode2->x, tileNode2.crossedViaNode2->y}})) ;
-            dx = (tileNode2.crossedViaNode1->x + tileNode2.crossedViaNode2->x)/2 ;
-            dy = (tileNode2.crossedViaNode1->y + tileNode2.crossedViaNode2->y)/2 ;
-            // debugLabels.push_back({to_string(*tileNode2.capacity), dx, dy}) ;
+            pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>> key1 = {tileNode2.crossedViaNode1, tileNode2.crossedViaNode2} ;
+            pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>> key2 = {tileNode2.crossedViaNode2, tileNode2.crossedViaNode1} ;
+            int capacity = (edgeNodeMapping.find(key1)!=edgeNodeMapping.end()) ? edgeNodeMapping[key1]->positions.size() : edgeNodeMapping[key2]->positions.size() ; 
+            (*tileNode2.capacity) = max((capacity-1)/2, 0) ;
         }
     }
 }
@@ -596,8 +593,13 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
     copy_if(routingBumps.begin(), routingBumps.end(), back_inserter(die2Bumps), [](const Bump& bump){return bump.name=="DIE2"; }) ;
     copy_if(offsetBumps.begin(), offsetBumps.end(), back_inserter(die2Bumps), [](const Bump& bump){return bump.name=="DIE2"; }) ;
 
+
     PaddingBumps(die1Bumps, die1PaddingBumps, die1Coordinate, minimumHorizontalSpace) ;
     PaddingBumps(die2Bumps, die2PaddingBumps, die2Coordinate, minimumHorizontalSpace) ;
+
+    copy_if(viaBumps.begin(), viaBumps.end(), back_inserter(die1Bumps), [](const Bump& bump){return bump.name=="DIE1"; }) ;
+    copy_if(viaBumps.begin(), viaBumps.end(), back_inserter(die2Bumps), [](const Bump& bump){return bump.name=="DIE2"; }) ;
+
 
     // 建立Via nodes
     CreateViaNodes(RDL1, die1Bumps) ; CreateViaNodes(RDL1, die1PaddingBumps) ;
@@ -607,18 +609,20 @@ void Router::ConstructRoutingGraph(const vector<Bump>& routingBumps, const vecto
     Triangulation(RDL1);
     Triangulation(RDL2);
 
+
     // 建立via-tile edges & tile-tile edges
     ConnectTileTileEdges(RDL1) ;     
     ConnectTileTileEdges(RDL2) ;     
 
-    CombineRDLs(RDL1, RDL2, RDL3, die1Coordinate, die2Coordinate) ; 
-    SetCapacity(RDL3, offsetBumps, viaBumps) ; 
-    CreateEdgeNodes(RDL3) ; 
-    graph = RDL3 ;
 
+
+    CombineRDLs(RDL1, RDL2, RDL3, die1Coordinate, die2Coordinate) ; 
+    CreateEdgeNodes(RDL3, offsetBumps, viaBumps) ; 
+    SetCapacity(RDL3) ; 
+    graph = RDL3 ;
 }
 
-void Router::CreateEdgeNodes(RoutingGraph2& graph){
+void Router::CreateEdgeNodes(RoutingGraph2& graph, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps){
 
     shared_ptr<ViaNode2> viaNode1, viaNode2 ; 
     vector<pair<double, double>> positions ; 
@@ -629,6 +633,7 @@ void Router::CreateEdgeNodes(RoutingGraph2& graph){
     double theta ; 
     double distance ;
     int capacity ;
+    int offsetIndex ;
     set<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>> usedPairs ; 
     for(auto& tileNode : graph.tileNodes){
         for(auto& adjacentTileNode : tileNode->tileNodes){
@@ -637,71 +642,196 @@ void Router::CreateEdgeNodes(RoutingGraph2& graph){
             if(usedPairs.find(ptrPair)==usedPairs.end()){
                 usedPairs.insert(ptrPair) ;
                 
-
                 if(fabs(ptrPair.first->y - ptrPair.second->y) < 0.5) type = BaseEdge ; 
                 else type = LegEdge ; 
 
                 if(type==BaseEdge && ptrPair.first->x > ptrPair.second->x) swap(ptrPair.first, ptrPair.second) ; 
                 else if(type==LegEdge && ptrPair.first->y > ptrPair.second->y) swap(ptrPair.first, ptrPair.second) ; 
+                
 
-                dx = fabs(ptrPair.second->x - ptrPair.first->x) ; 
-                dy = fabs(ptrPair.second->y - ptrPair.first->y) ; 
+                dx = ptrPair.second->x - ptrPair.first->x ; 
+                dy = ptrPair.second->y - ptrPair.first->y ; 
                 bx = ptrPair.first->x ;
                 by = ptrPair.first->y ;
 
-                theta = atan2(dy, dx+1e-6) ; 
+                // if(type==BaseEdge){ //處理offset via
+                //     for(int i=0; i<offsetBumps.size(); ++i){
+                //         auto& bump = offsetBumps[i] ;
+                //         if(bump.name==ptrPair.second->name && bump.id==ptrPair.second->id && bump.type==ptrPair.second->type){
+                //             dx = viaBumps[i].x - ptrPair.first->x ; dy = viaBumps[i].y - ptrPair.first->y ; 
+                //             break;
+                //         }
+                //     }
+                // }
+                theta = atan2(dy, (dx)+1e-6) ; 
+                
 
-                if(1){
-                    dx -= designRule.minimumViaPadSpacing*cos(theta) ;
-                    dy -= designRule.minimumViaPadSpacing*sin(theta) ; 
-                    if(type==LegEdge){
-                        if( ptrPair.first->x < ptrPair.second->x){ // \.
-                            bx += designRule.minimumViaPadSpacing*cos(theta) ; 
-                            by += designRule.minimumViaPadSpacing*sin(theta) ; 
-                        }else{ // /
-                            bx -= designRule.minimumViaPadSpacing*cos(theta) ; 
-                            by += designRule.minimumViaPadSpacing*sin(theta) ; 
-                        }
-                    }else{ // -
-                        bx += designRule.minimumViaPadSpacing*cos(theta) ; 
-                    }
-                    
-                } 
+                bx += designRule.minimumLineWidth*cos(theta) ; dx -= 2*designRule.minimumLineWidth*cos(theta) ; 
+                by += designRule.minimumLineWidth*sin(theta) ; dy -= 2*designRule.minimumLineWidth*sin(theta) ;
 
-                if(1){
-                    dx -= designRule.minimumViaPadSpacing*cos(theta) ;
-                    dy -= designRule.minimumViaPadSpacing*sin(theta) ; 
+                if(ptrPair.first->type!=DUMMY){
+                    bx += designRule.minimumViaPadSpacing/2*cos(theta) ; dx -= designRule.minimumViaPadSpacing/2*cos(theta) ; 
+                    by += designRule.minimumViaPadSpacing/2*sin(theta) ; dy -= designRule.minimumViaPadSpacing/2*sin(theta) ;
                 }
                 
-                distance = sqrt(dx*dx+dy*dy) ; 
-                capacity = 5 ; // max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing)), 0.0), !!!!!!!!!!!
-                positions.clear() ; 
-
-                if(type!=BaseEdge && ptrPair.first->x > ptrPair.second->x) dx = -dx ; 
-                rx = dx/capacity ; 
-                ry = dy/capacity ; 
-
-                for(int i=0; i<capacity; ++i){
-                    positions.push_back({bx+rx*i+0.5*rx, by+ry*i+0.5*ry}) ; 
-                    debugNets.push_back(Net(to_string(100000+debugNets.size()), {{bx+rx*i+0.5*rx, by+ry*i+0.5*ry, bx+rx*i+0.5*rx+1, by+ry*i+0.5*ry+1}})) ;
+                if(ptrPair.second->type!=DUMMY){
+                    dx -= designRule.minimumViaPadSpacing/2*cos(theta)  ; 
+                    dy -= designRule.minimumViaPadSpacing/2*sin(theta) ;
                 }
 
-                // if(type == BaseEdge) sort(positions.begin(), positions.end(), [](pair<double, double>& a, pair<double, double>& b){return a.first < b.first ; }) ;
-                // else sort(positions.begin(), positions.end(), [](pair<double, double>& a, pair<double, double>& b){return a.second < b.second ; }) ;
+                if(type==BaseEdge && dx<=0) distance = 0 ;
+                else if(type==LegEdge && dy<=0) distance = 0 ;
+                else distance = sqrt(dx*dx+dy*dy) ; 
+               
+                capacity = max(floor(distance/(designRule.minimumLineWidth + designRule.minimumLineSpacing)), 0.0) ; 
 
-                // cout << *ptrPair.first << " " << *ptrPair.second << " " << dx << "," << dy << " " << capacity << "|" << type << "\n" ;
-                // for(auto& [x,y] : positions) cout << x << "," << y << " " ;
-                // cout << "\n\n" ;
+                if(capacity!=0){
+                    rx = dx/capacity ; ry = dy/capacity ; 
+                    // cout << rx << " " << (designRule.minimumLineWidth + designRule.minimumLineSpacing)*cos(theta) << "\n" ;
+                    bx += 0.5*rx ; by += 0.5*ry ;
+                    // debugNets.push_back(Net(to_string(100000+debugNets.size()), {{bx, by, dx+bx, dy+by}})) ;
+                }
+                debugLabels.push_back({to_string(capacity), dx/2+bx, dy/2+by}) ;
+                positions.clear() ; 
+                
+                
+                for(int i=0; i<capacity; ++i){
+                    positions.push_back({bx+rx*i, by+ry*i}) ; 
+                }
+
+                if(capacity!=0){
+                    // debugNets.push_back(Net(to_string(100000+debugNets.size()), {{positions[0].first, positions[0].second, positions.back().first, positions.back().second}})) ;
+                }
+
                 graph.edgeNodes.push_back(make_shared<EdgeNode>(ptrPair.first, ptrPair.second, type, positions)) ;
             }
         }
     }
 }
-double Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets){
+double Router::GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GlobalNet>& nets){
     return 0 ; 
 }
 
-double Router::DetailRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph){
+double Router::DetailRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GlobalNet>& globalNets, vector<DetailedNet>& detailedNets){
+    detailedNets.clear() ; 
+    
+    map<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>, shared_ptr<EdgeNode>> viaNodeToEdgeNode ;  
+
+    map<TileToTileEdge, shared_ptr<EdgeNode>> edgeNodeMapping ;  
+    map<shared_ptr<EdgeNode>, int> usedNum ;
+    map<shared_ptr<EdgeNode>, DieType> lastUsedType ;
+
+    for(auto& edgeNode : graph.edgeNodes){
+        viaNodeToEdgeNode[{edgeNode->viaNode1, edgeNode->viaNode2}] = edgeNode ; 
+        viaNodeToEdgeNode[{edgeNode->viaNode2, edgeNode->viaNode1}] = edgeNode ; 
+    }
+
+    for(auto& tileNode : graph.tileNodes){
+        // cout << *tileNode->viaNodes[0] << " " << *tileNode->viaNodes[1] << " " << *tileNode->viaNodes[2] << "|\n" ; 
+        for(auto& tileToTileEdge : tileNode->tileNodes){
+            edgeNodeMapping[tileToTileEdge] = viaNodeToEdgeNode[{tileToTileEdge.crossedViaNode1,tileToTileEdge.crossedViaNode2}] ;
+            // cout << *tileToTileEdge.crossedViaNode1 << " " << *tileToTileEdge.crossedViaNode2 << "\n" ; 
+            // auto& vv = viaNodeToEdgeNode[{tileToTileEdge.crossedViaNode1,tileToTileEdge.crossedViaNode2}] ;
+            // cout << *vv->viaNode1 << " " << *vv->viaNode2 << "|\n" ;
+        }
+        // cout << "\n\n" ;
+    }
+
+    for(int i=0; i<globalNets.size(); ++i){
+        GlobalNet& gnet = globalNets[i] ;
+        DetailedNet dnet ; 
+        
+        dnet.name = gnet.name ; 
+        dnet.type = gnet.type ; 
+        dnet.id = gnet.id ; 
+        dnet.startViaNode = gnet.startViaNode ;
+        dnet.endViaNode = gnet.endViaNode ;
+        
+        // cout << gnet.name << " " << DieType2Str(gnet.type) << " " << gnet.id << "\n" ;
+
+        for(int j=1; j<gnet.size(); ++j){ //1開始是因為第0個TileToTile Node是空2邊的
+            shared_ptr<EdgeNode> edgeNode = viaNodeToEdgeNode[{gnet[j].crossedViaNode1, gnet[j].crossedViaNode2}] ;
+
+            if(lastUsedType[edgeNode]==VSS && !gnet.startViaNode) --usedNum[edgeNode] ; 
+
+            if(usedNum.find(edgeNode)==usedNum.end()) usedNum[edgeNode] = 0 ;
+
+            if(edgeNode->type==LegEdge) dnet.push_back({edgeNode, usedNum[edgeNode]}) ; 
+            else{
+                
+                if(edgeNode->positions[0].second < dnet.back().first->positions[0].second) dnet.push_back({edgeNode, usedNum[edgeNode]}) ; //斜上
+                else dnet.push_back({edgeNode, edgeNode->positions.size()-1-usedNum[edgeNode]}) ; // 斜下
+            }
+            
+            ++usedNum[edgeNode] ; 
+
+            if(gnet.startViaNode) lastUsedType[edgeNode] = SIGNAL ; 
+            else lastUsedType[edgeNode] = VSS ; 
+        }
+        // cout << "\n" ;
+        detailedNets.push_back(dnet) ; 
+    }
+
+    vector<string> colorTypes = {"blue", "red", "gray", "white"} ; 
+        
+
+    for(int i=0, v=0; i<detailedNets.size(); ++i, ++v){
+        string ccolor = colorTypes[v%colorTypes.size()] ; 
+        auto& detailedNet = detailedNets[i] ; 
+
+        if(!detailedNet.startViaNode) ccolor = "green" ;
+
+        if(detailedNet.startViaNode){
+            debugNets.push_back(Net(ccolor, {{detailedNet.startViaNode->x , detailedNet.startViaNode->y,
+                detailedNet[0].first->positions[detailedNet[0].second].first,  detailedNet[0].first->positions[detailedNet[0].second].second}})) ;
+            
+            double dx = detailedNet[0].first->positions[detailedNet[0].second].first-detailedNet.startViaNode->x ;
+            double dy = detailedNet[0].first->positions[detailedNet[0].second].second-detailedNet.startViaNode->y ;
+            double theta = atan2(dy, dx+1e-6) ;
+
+            debugTeardrops.emplace_back( 
+                detailedNet.startViaNode->name, 
+                detailedNet.startViaNode->type,
+                detailedNet.startViaNode->id,
+                detailedNet.startViaNode->x,
+                detailedNet.startViaNode->y,
+                detailedNet.startViaNode->x + designRule.minimumTeardropDist*cos(theta),
+                detailedNet.startViaNode->y + designRule.minimumTeardropDist*sin(theta)
+            ) ;
+        }
+
+        // cout << detailedNets[i].size() << "\n" ;
+        for(int j=0; j<detailedNets[i].size()-1; ++j){
+            // cout << detailedNet[i].first->positions[detailedNet[i].second].first << " " <<  detailedNet[i].first->positions[detailedNet[i].second].second << "\n" ;
+            debugNets.push_back(Net(ccolor, {{detailedNet[j].first->positions[detailedNet[j].second].first,  detailedNet[j].first->positions[detailedNet[j].second].second,
+                    detailedNet[j+1].first->positions[detailedNet[j+1].second].first,  detailedNet[j+1].first->positions[detailedNet[j+1].second].second}})) ;
+        }
+        // cout << "\n" ;
+        
+        
+        if(detailedNet.endViaNode){
+            debugNets.push_back(Net(ccolor, {{detailedNet.back().first->positions[detailedNet.back().second].first,  detailedNet.back().first->positions[detailedNet.back().second].second,
+                    detailedNet.endViaNode->x , detailedNet.endViaNode->y}})) ;
+
+                      
+            double dx =  detailedNet.endViaNode->x - detailedNet.back().first->positions[detailedNet.back().second].first ;
+            double dy =  detailedNet.endViaNode->y - detailedNet.back().first->positions[detailedNet.back().second].second ; 
+            double theta = atan2(dy, dx+1e-6) ;
+
+            debugTeardrops.emplace_back( 
+                detailedNet.endViaNode->name, 
+                detailedNet.endViaNode->type,
+                detailedNet.endViaNode->id,
+                detailedNet.endViaNode->x,
+                detailedNet.endViaNode->y,
+                detailedNet.endViaNode->x - designRule.minimumTeardropDist*cos(theta),
+                detailedNet.endViaNode->y - designRule.minimumTeardropDist*sin(theta)
+            ) ;
+        }
+    }
+
+
+
     return 0 ; 
 }
 

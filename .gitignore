@@ -5,6 +5,8 @@ build/
 resources/
 result/
 wu_result/
+wu_result2/
+log
 case/
 bin/
 Makefile

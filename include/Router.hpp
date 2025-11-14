@@ -34,9 +34,9 @@ protected:
     void CreateViaNodes(RoutingGraph2& graph, const vector<Bump>& bumps) ;
     void Triangulation(RoutingGraph2& graph) ;
     void ConnectTileTileEdges(RoutingGraph2& graph) ;
-    void SetCapacity(RoutingGraph2& graph, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps) ; 
+    void SetCapacity(RoutingGraph2& graph) ; 
 
-    void CreateEdgeNodes(RoutingGraph2& graph) ;
+    void CreateEdgeNodes(RoutingGraph2& graph, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps) ;
 
     void CombineRDLs(RoutingGraph2& graph1, RoutingGraph2& graph2, RoutingGraph2& graph3, const vector<double>& coordinate1, const vector<double>& coordinate2) ; 
 
@@ -45,9 +45,8 @@ protected:
     void ConstructRoutingGraph(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, RoutingGraph2& graph, double minimumHorizontalSpace, const vector<double>& coordinate) ; 
     void GenerateGraphFile(const vector<Bump>& routingBumps, const vector<Bump>& offsetBumps, const vector<Bump>& viaBumps, const RoutingGraph2& graph, int layer,  const string& directoryPath) ;
     
-    virtual double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets) ; 
-    
-    virtual double DetailRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph) ; 
+    virtual double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GlobalNet>& nets) ; 
+    virtual double DetailRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GlobalNet>& nets, vector<DetailedNet>& detailedNets) ; 
 public:
     DesignRule designRule ; 
     vector<Bump> bumps ; 

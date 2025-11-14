@@ -18,6 +18,9 @@
 extern vector<Bump> debugBumps ; 
 extern vector<Net> debugNets ; 
 extern vector<tuple<string, double, double>> debugLabels ; 
+extern vector<Timer> globalTimers ; 
+extern vector<double> globalExecTimes ; 
+
 struct ChannelType ;
 struct PhenotypeType ;
 struct GenotypeType ; 
@@ -72,13 +75,13 @@ struct ChromosomeType{
     shared_ptr<vector<ChannelType>> channelsPtr ; 
 };
 
+
 struct ClusterChromosomes : vector<ChromosomeType>{
-    void ToGraphNets(const vector<int>& orders, vector<GraphNet>& nets) ;
+    void ToGlobalNet(const vector<int>& orders, vector<GlobalNet>& nets) ;
     double fitness = -1.0 ;  
 };
 
 class GARouter : public Router {
-    vector<int> order ; 
 
     void AddShielding(ClusterChromosomes& chromosomes, vector<int>& orders) ; 
     void DetermineOrder(ClusterChromosomes& chromosomes, vector<int>& topDownOrders) ; 
@@ -87,17 +90,58 @@ class GARouter : public Router {
     double CacluteConflictCount(ClusterChromosomes& chromosomes) ; 
     double CacluteCapacityValue(ClusterChromosomes& chromosomes) ; 
     double Fitness(ClusterChromosomes& chromosomes) ; 
+ 
 
+    void Initial(const vector<tuple<int,int, int, int, int>>& genotypeInformations, const vector<tuple<int,int,int>>& phenotypeInformations,
+                 const vector<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>>& connections,  
+                 const vector<ChannelType>& channels, vector<shared_ptr<ClusterChromosomes>>& population) ; 
+    
+                 
+    void SelectParents(vector<shared_ptr<ClusterChromosomes>>& population, 
+                       vector<shared_ptr<ClusterChromosomes>>& parents1, 
+                       vector<shared_ptr<ClusterChromosomes>>& parents2) ; 
+
+    void Crossover(vector<shared_ptr<ClusterChromosomes>>& population1, 
+                       vector<shared_ptr<ClusterChromosomes>>& population2, 
+                       vector<shared_ptr<ClusterChromosomes>>& offsprings) ; 
+    
+    void Mutation(vector<shared_ptr<ClusterChromosomes>>& population, 
+                  vector<shared_ptr<ClusterChromosomes>>& offsprings) ; 
+
+
+    void SelectSurviors(vector<shared_ptr<ClusterChromosomes>>& population, 
+                        vector<shared_ptr<ClusterChromosomes>>& offsprings, 
+                        vector<shared_ptr<ClusterChromosomes>>& survivors) ; 
+    void Evaluate(vector<shared_ptr<ClusterChromosomes>>& population) ; 
+    
+    void EvaluateAll(vector<shared_ptr<ClusterChromosomes>>& population, bool showAverage=false) ; 
+
+
+
+    
     void Initial(const vector<tuple<int,int, int, int, int>>& genotypeInformations, const vector<tuple<int,int,int>>& phenotypeInformations,
                  const vector<pair<shared_ptr<ViaNode2>, shared_ptr<ViaNode2>>>& connections,  
                  const vector<ChannelType>& channels, vector<ClusterChromosomes>& population) ; 
     
-    void SelectParents(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& parents1, vector<ClusterChromosomes>& parents2) ; 
-    void Crossover(vector<ClusterChromosomes>& population1, vector<ClusterChromosomes>& population2, vector<ClusterChromosomes>& offsprings) ; 
-    void Mutation(vector<ClusterChromosomes>& population, vector<ClusterChromosomes>& offsprings) ; 
-    void SelectSurviors(vector<ClusterChromosomes>& population,  vector<ClusterChromosomes>& offsprings, vector<ClusterChromosomes>& survivors) ;
+                 
+    void SelectParents(vector<ClusterChromosomes>& population, 
+                       vector<ClusterChromosomes>& parents1, 
+                       vector<ClusterChromosomes>& parents2) ; 
+
+    void Crossover(vector<ClusterChromosomes>& population1, 
+                       vector<ClusterChromosomes>& population2, 
+                       vector<ClusterChromosomes>& offsprings) ; 
+    
+    void Mutation(vector<ClusterChromosomes>& population, 
+                  vector<ClusterChromosomes>& offsprings) ; 
+
+
+    void SelectSurviors(vector<ClusterChromosomes>& population, 
+                        vector<ClusterChromosomes>& offsprings, 
+                        vector<ClusterChromosomes>& survivors) ; 
     void Evaluate(vector<ClusterChromosomes>& population) ; 
-    void EvaluateAll(vector<ClusterChromosomes>& population) ; 
+    
+    void EvaluateAll(vector<ClusterChromosomes>& population, bool showAverage=false) ; 
 
     void ConstructChannel() ;  
     void ConstructRepresentation() ; 
@@ -109,7 +153,7 @@ public:
 
     Configuration config ;
     using Router::Router ; 
-    double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GraphNet>& nets) override ;
+    double GlobalRoute(const vector<Bump>& routingBumps, RoutingGraph2& graph, vector<GlobalNet>& nets) override ;
 
 } ;
 
